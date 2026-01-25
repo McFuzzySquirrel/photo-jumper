@@ -487,7 +487,7 @@
 
                 // Stuck detection: if player hasn't moved significantly in a while
                 const now = Date.now();
-                const distMoved = Math.sqrt(Math.pow(this.x - this.lastX, 2) + Math.pow(this.y - this.lastY, 2));
+                const distMoved = Math.sqrt((this.x - this.lastX) ** 2 + (this.y - this.lastY) ** 2);
                 
                 if (now - this.lastPositionTime > this.stuckCheckInterval) {
                     if (distMoved < 5 && this.onGround) {
@@ -668,7 +668,12 @@
                     return false;
                 }
                 
-                let edgeStrength = 0;
+                // Get center brightness
+                const centerI = (y * width + x) * 4;
+                const centerBrightness = (data[centerI] + data[centerI + 1] + data[centerI + 2]) / 3;
+                
+                // Check brightness difference with neighbors
+                let maxDiff = 0;
                 const checkPositions = [
                     [x - 1, y], [x + gridSize, y],
                     [x, y - 1], [x, y + gridSize]
@@ -677,14 +682,13 @@
                 for (const [px, py] of checkPositions) {
                     if (px >= 0 && px < width && py >= 0 && py < height) {
                         const i = (py * width + px) * 4;
-                        const r = data[i];
-                        const g = data[i + 1];
-                        const b = data[i + 2];
-                        const brightness = (r + g + b) / 3;
-                        edgeStrength += Math.abs(brightness);
+                        const neighborBrightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                        const diff = Math.abs(centerBrightness - neighborBrightness);
+                        maxDiff = Math.max(maxDiff, diff);
                     }
                 }
-                return edgeStrength > 50;
+                // Significant brightness difference indicates an edge
+                return maxDiff > 40;
             }
 
             for (let y = 0; y < height; y += gridSize) {
@@ -795,17 +799,12 @@
                 // Check if player reached the goal
                 if (goal && !gameWon && goal.checkCollision(player)) {
                     gameWon = true;
-                    // Display win message
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-                    ctx.fillRect(0, canvas.height / 2 - 50, canvas.width, 100);
-                    ctx.fillStyle = '#FFD700';
-                    ctx.font = 'bold 36px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('🎉 YOU WIN! 🎉', canvas.width / 2, canvas.height / 2);
-                    ctx.font = '20px Arial';
-                    ctx.fillStyle = '#FFF';
-                    ctx.fillText(`Time: ${Math.floor((Date.now() - startTime) / 1000)}s`, canvas.width / 2, canvas.height / 2 + 30);
                 }
+            }
+
+            // Draw win message if game is won
+            if (gameWon) {
+                drawWinMessage();
             }
 
             // Update time
@@ -813,6 +812,19 @@
             timeElement.textContent = elapsedTime;
 
             requestAnimationFrame(gameLoop);
+        }
+
+        // Draw win message overlay
+        function drawWinMessage() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, canvas.height / 2 - 50, canvas.width, 100);
+            ctx.fillStyle = '#FFD700';
+            ctx.font = 'bold 36px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('🎉 YOU WIN! 🎉', canvas.width / 2, canvas.height / 2);
+            ctx.font = '20px Arial';
+            ctx.fillStyle = '#FFF';
+            ctx.fillText(`Time: ${Math.floor((Date.now() - startTime) / 1000)}s`, canvas.width / 2, canvas.height / 2 + 30);
         }
 
         // Reset game
