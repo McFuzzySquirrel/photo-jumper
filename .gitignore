@@ -12,6 +12,12 @@ Thumbs.db
 # Logs
 *.log
 
+# Node
+node_modules/
+
+# Local feedback storage
+feedback/
+
 # Temporary files
 tmp/
 temp/

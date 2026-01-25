@@ -1,0 +1,13 @@
+{
+  "name": "photo-jumper",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Photo Jumper - serve the game on your LAN and collect local feedback",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
