@@ -623,7 +623,6 @@
             // Group consecutive edge cells into platforms, limiting thickness to MAX_PLATFORM_THICKNESS
             for (let gridY = 0; gridY < edgeMap.length; gridY++) {
                 let platformStart = -1;
-                let platformThickness = 0;
                 
                 for (let gridX = 0; gridX < edgeMap[0].length; gridX++) {
                     const isEdge = edgeMap[gridY][gridX] > EDGE_THRESHOLD;
@@ -631,17 +630,14 @@
                     if (isEdge && platformStart === -1) {
                         // Start a new potential platform
                         platformStart = gridX;
-                        platformThickness = 1;
-                    } else if (isEdge && platformStart !== -1) {
-                        // Continue the platform horizontally (same row)
                     } else if (!isEdge && platformStart !== -1) {
                         // End of platform - create it if it's wide enough
                         const platformWidth = (gridX - platformStart) * gridSize;
                         if (platformWidth >= gridSize) {
                             const x = platformStart * gridSize;
                             const y = gridY * gridSize;
-                            // Limit height to MAX_PLATFORM_THICKNESS blocks
-                            const platformHeight = Math.min(gridSize * MAX_PLATFORM_THICKNESS, gridSize);
+                            // Platform height is 1 block (gridSize), which satisfies the max 2 blocks requirement
+                            const platformHeight = gridSize;
                             
                             // Get average brightness for color
                             let totalBrightness = 0;
@@ -674,7 +670,8 @@
                     if (platformWidth >= gridSize) {
                         const x = platformStart * gridSize;
                         const y = gridY * gridSize;
-                        const platformHeight = Math.min(gridSize * MAX_PLATFORM_THICKNESS, gridSize);
+                        // Platform height is 1 block (gridSize), which satisfies the max 2 blocks requirement
+                        const platformHeight = gridSize;
                         
                         let totalBrightness = 0;
                         let pixelCount = 0;
