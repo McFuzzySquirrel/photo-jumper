@@ -383,7 +383,7 @@
         const FEEDBACK_TOKEN_STORAGE_KEY = 'photoJumperFeedbackToken';
 
         // Game configuration constants
-        const GRID_SIZE = 20;
+        const GRID_SIZE = 40;  // Increased from 20 to create gaps for jumping
         const BRIGHTNESS_THRESHOLD = 128;
         const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -516,7 +516,7 @@
             }
 
             respawn() {
-                this.x = 50;
+                this.x = 40;  // Match initial spawn position
                 this.y = canvas.height - 100;
                 this.velocityX = 0;
                 this.velocityY = 0;
@@ -713,15 +713,20 @@
 
                     // Create platform if brightness is below threshold OR at edges (better object detection)
                     const isEdge = hasEdge(x, y, width, height, data);
-                    if (avgBrightness < brightnessThreshold || (isEdge && avgBrightness < 180)) {
+                    
+                    // Reserve start area (bottom-left) and goal area (top-right) - don't generate platforms there
+                    const isStartArea = (x < 120 && y > height - 80);
+                    const isGoalArea = (x > width - 100 && y < 80);
+                    
+                    if (!isStartArea && !isGoalArea && (avgBrightness < brightnessThreshold || (isEdge && avgBrightness < 180))) {
                         const platformWidth = Math.min(gridSize, width - x);
                         const platformHeight = Math.min(gridSize, height - y);
                         
                         // Ensure minimum platform size for better navigability
                         if (platformWidth >= gridSize && platformHeight >= gridSize) {
-                            // Use semi-transparent color so photo shows through
-                            const alpha = 0.4; // 40% opacity
-                            const colorValue = Math.floor(avgBrightness);
+                            // Use darker, more opaque color for better visibility
+                            const alpha = 0.7; // Increased from 0.4 to 0.7 for better visibility
+                            const colorValue = Math.floor(avgBrightness * 0.6); // Darker shade
                             const color = `rgba(${colorValue}, ${colorValue}, ${colorValue}, ${alpha})`;
                             
                             platforms.push(new Platform(x, y, platformWidth, platformHeight, color));
@@ -730,21 +735,21 @@
                 }
             }
 
-            // Add a ground platform at the bottom (semi-transparent)
-            platforms.push(new Platform(0, height - 20, width, 20, 'rgba(139, 69, 19, 0.5)'));
+            // Add a ground platform at the bottom (darker and more opaque)
+            platforms.push(new Platform(0, height - 20, width, 20, 'rgba(100, 60, 20, 0.8)'));
 
-            // Add starting platform (green to indicate start)
-            platforms.push(new Platform(0, height - 60, 100, 20, 'rgba(0, 200, 0, 0.6)'));
+            // Add starting platform (green to indicate start, larger and clearer)
+            platforms.push(new Platform(10, height - 60, 100, 20, 'rgba(0, 180, 0, 0.9)'));
 
             // Add goal at top-right corner of the level
             const goalX = width - 50;
             const goalY = 20;
-            // Add a platform for the goal to sit on
-            platforms.push(new Platform(goalX - 10, goalY + 30, 50, 20, 'rgba(255, 215, 0, 0.6)'));
+            // Add a platform for the goal to sit on (golden and more visible)
+            platforms.push(new Platform(goalX - 10, goalY + 30, 50, 20, 'rgba(255, 200, 0, 0.9)'));
             goal = new Goal(goalX, goalY);
 
-            // Initialize player
-            player = new Player(50, height - 100);
+            // Initialize player on the start platform
+            player = new Player(40, height - 100);
 
             // Start game
             startGame();
