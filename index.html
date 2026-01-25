@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Jumper - Platform Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+
+        .upload-section {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #fileInput, #cameraInput {
+            display: none;
+        }
+
+        .game-canvas-container {
+            position: relative;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        #gameCanvas {
+            border: 3px solid #333;
+            border-radius: 10px;
+            max-width: 100%;
+            background: #87ceeb;
+            display: none;
+        }
+
+        .instructions {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .instructions p {
+            margin-bottom: 8px;
+            color: #666;
+        }
+
+        .game-info {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            display: none;
+        }
+
+        .preview-canvas {
+            display: none;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            button {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+
+            .container {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Photo Jumper</h1>
+        
+        <div class="upload-section">
+            <div class="button-group">
+                <button id="uploadBtn">📁 Upload Photo</button>
+                <button id="cameraBtn">📷 Take Photo</button>
+                <button id="resetBtn" style="display: none;">🔄 New Photo</button>
+            </div>
+            <input type="file" id="fileInput" accept="image/*">
+            <input type="file" id="cameraInput" accept="image/*" capture="environment">
+        </div>
+
+        <div class="game-info" id="gameInfo">
+            Score: <span id="score">0</span> | Time: <span id="time">0</span>s
+        </div>
+
+        <div class="game-canvas-container">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <canvas id="previewCanvas" class="preview-canvas"></canvas>
+        </div>
+
+        <div class="instructions">
+            <h3>How to Play:</h3>
+            <p>1. Upload a photo or take one with your camera</p>
+            <p>2. The photo will be converted into platforms based on brightness</p>
+            <p>3. Use <strong>Arrow Keys</strong> or <strong>WASD</strong> to move (or touch controls on mobile)</p>
+            <p>4. Press <strong>Space</strong> or <strong>Up Arrow</strong> to jump</p>
+            <p>5. Navigate through the level and avoid falling!</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const previewCanvas = document.getElementById('previewCanvas');
+        const previewCtx = previewCanvas.getContext('2d');
+        
+        const uploadBtn = document.getElementById('uploadBtn');
+        const cameraBtn = document.getElementById('cameraBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const fileInput = document.getElementById('fileInput');
+        const cameraInput = document.getElementById('cameraInput');
+        const gameInfo = document.getElementById('gameInfo');
+        const scoreElement = document.getElementById('score');
+        const timeElement = document.getElementById('time');
+
+        // Game configuration constants
+        const GRID_SIZE = 20;
+        const BRIGHTNESS_THRESHOLD = 128;
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+        let gameRunning = false;
+        let platforms = [];
+        let player = null;
+        let keys = {};
+        let score = 0;
+        let startTime = 0;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchJumping = false;
+
+        // Player class
+        class Player {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 30;
+                this.height = 30;
+                this.velocityX = 0;
+                this.velocityY = 0;
+                this.speed = 5;
+                this.jumpPower = 12;
+                this.gravity = 0.5;
+                this.onGround = false;
+            }
+
+            update() {
+                // Horizontal movement
+                if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+                    this.velocityX = -this.speed;
+                } else if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+                    this.velocityX = this.speed;
+                } else {
+                    this.velocityX *= 0.8; // Friction
+                }
+
+                // Jumping
+                if ((keys['ArrowUp'] || keys['w'] || keys['W'] || keys[' '] || touchJumping) && this.onGround) {
+                    this.velocityY = -this.jumpPower;
+                    this.onGround = false;
+                    touchJumping = false; // Reset touch jump
+                }
+
+                // Apply gravity
+                this.velocityY += this.gravity;
+
+                // Update horizontal position
+                this.x += this.velocityX;
+
+                // Check horizontal platform collisions
+                for (let platform of platforms) {
+                    if (this.checkCollision(platform)) {
+                        // Push out from sides
+                        if (this.x + this.width / 2 < platform.x + platform.width / 2) {
+                            this.x = platform.x - this.width;
+                        } else {
+                            this.x = platform.x + platform.width;
+                        }
+                        this.velocityX = 0;
+                    }
+                }
+
+                // Update vertical position
+                this.y += this.velocityY;
+
+                // Check vertical platform collisions
+                this.onGround = false;
+                for (let platform of platforms) {
+                    if (this.checkCollision(platform)) {
+                        // Landing on top of platform
+                        if (this.velocityY > 0 && this.y + this.height - this.velocityY <= platform.y) {
+                            this.y = platform.y - this.height;
+                            this.velocityY = 0;
+                            this.onGround = true;
+                        }
+                        // Hitting platform from below
+                        else if (this.velocityY < 0 && this.y - this.velocityY >= platform.y + platform.height) {
+                            this.y = platform.y + platform.height;
+                            this.velocityY = 0;
+                        }
+                    }
+                }
+
+                // Boundary checks
+                if (this.x < 0) this.x = 0;
+                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+
+                // Check if player fell off
+                if (this.y > canvas.height) {
+                    this.respawn();
+                }
+
+                // Update score based on highest position reached
+                const currentScore = Math.max(0, Math.floor((canvas.height - this.y) / 10));
+                if (currentScore > score) {
+                    score = currentScore;
+                    scoreElement.textContent = score;
+                }
+            }
+
+            checkCollision(platform) {
+                return this.x < platform.x + platform.width &&
+                       this.x + this.width > platform.x &&
+                       this.y < platform.y + platform.height &&
+                       this.y + this.height > platform.y;
+            }
+
+            respawn() {
+                this.x = 50;
+                this.y = canvas.height - 100;
+                this.velocityX = 0;
+                this.velocityY = 0;
+                score = Math.max(0, score - 10);
+                scoreElement.textContent = score;
+            }
+
+            draw() {
+                ctx.fillStyle = '#ff4444';
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // Draw eyes
+                ctx.fillStyle = 'white';
+                ctx.fillRect(this.x + 8, this.y + 8, 6, 6);
+                ctx.fillRect(this.x + 16, this.y + 8, 6, 6);
+                
+                ctx.fillStyle = 'black';
+                ctx.fillRect(this.x + 10, this.y + 10, 3, 3);
+                ctx.fillRect(this.x + 18, this.y + 10, 3, 3);
+            }
+        }
+
+        // Platform class
+        class Platform {
+            constructor(x, y, width, height, color) {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.color = color;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+            }
+        }
+
+        // Process image and create platforms
+        function processImage(image) {
+            // Set canvas size based on image aspect ratio
+            const maxWidth = 800;
+            const maxHeight = 600;
+            let width = image.width;
+            let height = image.height;
+
+            if (width > maxWidth) {
+                height = (height * maxWidth) / width;
+                width = maxWidth;
+            }
+            if (height > maxHeight) {
+                width = (width * maxHeight) / height;
+                height = maxHeight;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            previewCanvas.width = width;
+            previewCanvas.height = height;
+
+            // Draw image to preview canvas
+            previewCtx.drawImage(image, 0, 0, width, height);
+            const imageData = previewCtx.getImageData(0, 0, width, height);
+            const data = imageData.data;
+
+            // Create platforms based on brightness
+            platforms = [];
+            const gridSize = GRID_SIZE;
+            const brightnessThreshold = BRIGHTNESS_THRESHOLD;
+
+            for (let y = 0; y < height; y += gridSize) {
+                for (let x = 0; x < width; x += gridSize) {
+                    let totalBrightness = 0;
+                    let pixelCount = 0;
+
+                    // Calculate average brightness of grid cell
+                    for (let dy = 0; dy < gridSize && y + dy < height; dy++) {
+                        for (let dx = 0; dx < gridSize && x + dx < width; dx++) {
+                            const i = ((y + dy) * width + (x + dx)) * 4;
+                            const r = data[i];
+                            const g = data[i + 1];
+                            const b = data[i + 2];
+                            const brightness = (r + g + b) / 3;
+                            totalBrightness += brightness;
+                            pixelCount++;
+                        }
+                    }
+
+                    const avgBrightness = totalBrightness / pixelCount;
+
+                    // Create platform if brightness is below threshold (darker areas)
+                    if (avgBrightness < brightnessThreshold) {
+                        const platformWidth = Math.min(gridSize, width - x);
+                        const platformHeight = Math.min(gridSize, height - y);
+                        
+                        // Color based on brightness
+                        const colorValue = Math.floor(avgBrightness);
+                        const color = `rgb(${colorValue}, ${colorValue}, ${colorValue})`;
+                        
+                        platforms.push(new Platform(x, y, platformWidth, platformHeight, color));
+                    }
+                }
+            }
+
+            // Add a ground platform at the bottom
+            platforms.push(new Platform(0, height - 20, width, 20, '#8B4513'));
+
+            // Add starting platform
+            platforms.push(new Platform(0, height - 60, 100, 20, '#8B4513'));
+
+            // Initialize player
+            player = new Player(50, height - 100);
+
+            // Start game
+            startGame();
+        }
+
+        // Start the game loop
+        function startGame() {
+            gameRunning = true;
+            canvas.style.display = 'block';
+            gameInfo.style.display = 'block';
+            resetBtn.style.display = 'inline-block';
+            uploadBtn.style.display = 'none';
+            cameraBtn.style.display = 'none';
+            
+            score = 0;
+            startTime = Date.now();
+            scoreElement.textContent = score;
+            
+            gameLoop();
+        }
+
+        // Main game loop
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            // Clear canvas
+            ctx.fillStyle = '#87ceeb';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update and draw platforms
+            for (let platform of platforms) {
+                platform.draw();
+            }
+
+            // Update and draw player
+            if (player) {
+                player.update();
+                player.draw();
+            }
+
+            // Update time
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            timeElement.textContent = elapsedTime;
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Reset game
+        function resetGame() {
+            gameRunning = false;
+            platforms = [];
+            player = null;
+            score = 0;
+            canvas.style.display = 'none';
+            gameInfo.style.display = 'none';
+            resetBtn.style.display = 'none';
+            uploadBtn.style.display = 'inline-block';
+            cameraBtn.style.display = 'inline-block';
+        }
+
+        // Event listeners
+        uploadBtn.addEventListener('click', () => fileInput.click());
+        cameraBtn.addEventListener('click', () => cameraInput.click());
+        resetBtn.addEventListener('click', resetGame);
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                // Validate file type
+                if (!file.type.match('image.*')) {
+                    alert('Please select a valid image file.');
+                    return;
+                }
+                
+                // Validate file size
+                if (file.size > MAX_FILE_SIZE) {
+                    alert('File is too large. Please select an image under 10MB.');
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => processImage(img);
+                    img.onerror = () => {
+                        alert('Failed to load image. Please try a different file.');
+                    };
+                    img.src = event.target.result;
+                };
+                reader.onerror = () => {
+                    alert('Failed to read file. Please try again.');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        cameraInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                // Validate file type
+                if (!file.type.match('image.*')) {
+                    alert('Please capture a valid image.');
+                    return;
+                }
+                
+                // Validate file size
+                if (file.size > MAX_FILE_SIZE) {
+                    alert('Image is too large. Please try again.');
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => processImage(img);
+                    img.onerror = () => {
+                        alert('Failed to load image. Please try again.');
+                    };
+                    img.src = event.target.result;
+                };
+                reader.onerror = () => {
+                    alert('Failed to read image. Please try again.');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            // Prevent default for arrow keys and space
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // Touch controls for mobile
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            touchStartX = touch.clientX - rect.left;
+            touchStartY = touch.clientY - rect.top;
+            
+            // Jump on tap
+            touchJumping = true;
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const touchX = touch.clientX - rect.left;
+            const touchY = touch.clientY - rect.top;
+            
+            // Horizontal movement based on touch position
+            const deltaX = touchX - touchStartX;
+            
+            if (deltaX < -20) {
+                keys['ArrowLeft'] = true;
+                keys['ArrowRight'] = false;
+            } else if (deltaX > 20) {
+                keys['ArrowRight'] = true;
+                keys['ArrowLeft'] = false;
+            } else {
+                keys['ArrowLeft'] = false;
+                keys['ArrowRight'] = false;
+            }
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchJumping = false;
+            keys['ArrowLeft'] = false;
+            keys['ArrowRight'] = false;
+        });
+    </script>
+</body>
+</html>
