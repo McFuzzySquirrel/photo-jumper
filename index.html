@@ -316,7 +316,8 @@
             <p>2. The photo will be converted into platforms based on brightness</p>
             <p>3. Use <strong>Arrow Keys</strong> or <strong>WASD</strong> to move (or touch controls on mobile)</p>
             <p>4. Press <strong>Space</strong> or <strong>Up Arrow</strong> to jump</p>
-            <p>5. Navigate through the level and avoid falling!</p>
+            <p>5. Navigate from the green start platform to the golden goal star!</p>
+            <p>6. Press <strong>R</strong> to respawn if you get stuck</p>
         </div>
 
         <div id="feedbackModal" class="modal" aria-hidden="true">
@@ -382,13 +383,29 @@
         const FEEDBACK_TOKEN_STORAGE_KEY = 'photoJumperFeedbackToken';
 
         // Game configuration constants
-        const GRID_SIZE = 20;
+        const GRID_SIZE = 30;  // 1.5x player size (20px) for minimum jumping gaps
         const BRIGHTNESS_THRESHOLD = 128;
         const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        const EDGE_DETECTION_THRESHOLD = 40;  // Brightness difference for edge detection
+        const EDGE_BRIGHTNESS_THRESHOLD = 180;  // Max brightness for edge-detected platforms
+        
+        // Player spawn and reserved area constants
+        const PLAYER_SPAWN_X = 40;
+        const PLAYER_SPAWN_Y_OFFSET = 100; // Pixels above canvas bottom
+        const START_AREA_WIDTH = 140;  // Wider to ensure clear start area
+        const START_AREA_HEIGHT = 100;  // Taller to ensure clear start area
+        const GOAL_AREA_WIDTH = 100;
+        const GOAL_AREA_HEIGHT = 80;
+        
+        // Stuck detection constants
+        const STUCK_CHECK_INTERVAL = 3000;  // 3 seconds
+        const STUCK_MOVEMENT_THRESHOLD = 5;  // pixels
 
         let gameRunning = false;
         let platforms = [];
         let player = null;
+        let goal = null;  // Goal/end point for the level
+        let playerSpawnY = 0;  // Calculated spawn Y position
         let keys = {};
         let score = 0;
         let startTime = 0;
@@ -396,20 +413,25 @@
         let touchStartY = 0;
         let touchJumping = false;
         let backgroundImage = null; // Store the uploaded photo for background
+        let gameWon = false;  // Track if player reached the goal
 
         // Player class
         class Player {
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.width = 30;
-                this.height = 30;
+                this.width = 20;  // Reduced from 30 to fit better in spaces
+                this.height = 20; // Reduced from 30 to fit better in spaces
                 this.velocityX = 0;
                 this.velocityY = 0;
                 this.speed = 5;
                 this.jumpPower = 12;
                 this.gravity = 0.5;
                 this.onGround = false;
+                this.lastPositionTime = Date.now();
+                this.lastX = x;
+                this.lastY = y;
+                this.stuckCheckInterval = STUCK_CHECK_INTERVAL;
             }
 
             update() {
@@ -478,6 +500,26 @@
                     this.respawn();
                 }
 
+                // Stuck detection: if player hasn't moved significantly in a while
+                const now = Date.now();
+                const distMoved = Math.sqrt((this.x - this.lastX) ** 2 + (this.y - this.lastY) ** 2);
+                
+                if (now - this.lastPositionTime > this.stuckCheckInterval) {
+                    if (distMoved < STUCK_MOVEMENT_THRESHOLD && this.onGround) {
+                        // Player appears stuck, auto-respawn
+                        this.respawn();
+                        // Reset tracking variables after respawn to prevent immediate re-triggering
+                        this.lastX = this.x;
+                        this.lastY = this.y;
+                        this.lastPositionTime = Date.now();
+                    } else {
+                        // Update last known position when not stuck
+                        this.lastX = this.x;
+                        this.lastY = this.y;
+                        this.lastPositionTime = now;
+                    }
+                }
+
                 // Update score based on highest position reached
                 const currentScore = Math.max(0, Math.floor((canvas.height - this.y) / 10));
                 if (currentScore > score) {
@@ -494,8 +536,8 @@
             }
 
             respawn() {
-                this.x = 50;
-                this.y = canvas.height - 100;
+                this.x = PLAYER_SPAWN_X;
+                this.y = playerSpawnY;  // Use the calculated spawn Y position
                 this.velocityX = 0;
                 this.velocityY = 0;
                 score = Math.max(0, score - 10);
@@ -516,14 +558,73 @@
                 ctx.lineWidth = 2;
                 ctx.strokeRect(this.x, this.y, this.width, this.height);
                 
-                // Draw eyes
+                // Draw eyes (adjusted for smaller size)
                 ctx.fillStyle = 'white';
-                ctx.fillRect(this.x + 8, this.y + 8, 6, 6);
-                ctx.fillRect(this.x + 16, this.y + 8, 6, 6);
+                ctx.fillRect(this.x + 4, this.y + 5, 4, 4);
+                ctx.fillRect(this.x + 12, this.y + 5, 4, 4);
                 
                 ctx.fillStyle = 'black';
-                ctx.fillRect(this.x + 10, this.y + 10, 3, 3);
-                ctx.fillRect(this.x + 18, this.y + 10, 3, 3);
+                ctx.fillRect(this.x + 5, this.y + 6, 2, 2);
+                ctx.fillRect(this.x + 13, this.y + 6, 2, 2);
+            }
+        }
+
+        // Goal class - represents the end goal for the level
+        class Goal {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.width = 30;
+                this.height = 30;
+                this.animation = 0;
+            }
+
+            update() {
+                this.animation += 0.1;
+            }
+
+            checkCollision(player) {
+                return player.x < this.x + this.width &&
+                       player.x + player.width > this.x &&
+                       player.y < this.y + this.height &&
+                       player.y + player.height > this.y;
+            }
+
+            draw() {
+                // Draw animated star/goal
+                const centerX = this.x + this.width / 2;
+                const centerY = this.y + this.height / 2;
+                const outerRadius = 15 + Math.sin(this.animation) * 2;
+                const innerRadius = 7;
+                
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(this.animation * 0.5);
+                
+                // Draw star
+                ctx.beginPath();
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
+                    const radius = i % 2 === 0 ? outerRadius : innerRadius;
+                    const x = Math.cos(angle) * radius;
+                    const y = Math.sin(angle) * radius;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                
+                // Gradient fill
+                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, outerRadius);
+                gradient.addColorStop(0, '#FFD700');
+                gradient.addColorStop(1, '#FFA500');
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                ctx.strokeStyle = '#FF8C00';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                ctx.restore();
             }
         }
 
@@ -576,10 +677,40 @@
             const imageData = previewCtx.getImageData(0, 0, width, height);
             const data = imageData.data;
 
-            // Create platforms based on brightness
+            // Create platforms based on brightness and edge detection
             platforms = [];
             const gridSize = GRID_SIZE;
             const brightnessThreshold = BRIGHTNESS_THRESHOLD;
+
+            // Helper function to detect edges (helps identify objects better)
+            function hasEdge(x, y, width, height, data) {
+                // Allow edge detection near boundaries, just need 1-pixel neighbors
+                if (x === 0 || y === 0 || x + 1 >= width || y + 1 >= height) {
+                    return false;
+                }
+                
+                // Get center brightness
+                const centerI = (y * width + x) * 4;
+                const centerBrightness = (data[centerI] + data[centerI + 1] + data[centerI + 2]) / 3;
+                
+                // Check brightness difference with adjacent neighbors (1 pixel away)
+                let maxDiff = 0;
+                const checkPositions = [
+                    [x - 1, y], [x + 1, y],
+                    [x, y - 1], [x, y + 1]
+                ];
+                
+                for (const [px, py] of checkPositions) {
+                    if (px >= 0 && px < width && py >= 0 && py < height) {
+                        const i = (py * width + px) * 4;
+                        const neighborBrightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                        const diff = Math.abs(centerBrightness - neighborBrightness);
+                        maxDiff = Math.max(maxDiff, diff);
+                    }
+                }
+                // Significant brightness difference indicates an edge
+                return maxDiff > EDGE_DETECTION_THRESHOLD;
+            }
 
             for (let y = 0; y < height; y += gridSize) {
                 for (let x = 0; x < width; x += gridSize) {
@@ -601,29 +732,69 @@
 
                     const avgBrightness = totalBrightness / pixelCount;
 
-                    // Create platform if brightness is below threshold (darker areas)
-                    if (avgBrightness < brightnessThreshold) {
+                    // Create platform if brightness is below threshold OR at edges (better object detection)
+                    const isEdge = hasEdge(x, y, width, height, data);
+                    
+                    // Reserve start area (bottom-left) and goal area (top-right) - don't generate platforms there
+                    const isStartArea = (x < START_AREA_WIDTH && y > height - START_AREA_HEIGHT);
+                    const isGoalArea = (x > width - GOAL_AREA_WIDTH && y < GOAL_AREA_HEIGHT);
+                    
+                    if (!isStartArea && !isGoalArea && (avgBrightness < brightnessThreshold || (isEdge && avgBrightness < EDGE_BRIGHTNESS_THRESHOLD))) {
                         const platformWidth = Math.min(gridSize, width - x);
                         const platformHeight = Math.min(gridSize, height - y);
                         
-                        // Use semi-transparent color so photo shows through
-                        const alpha = 0.4; // 40% opacity
-                        const colorValue = Math.floor(avgBrightness);
-                        const color = `rgba(${colorValue}, ${colorValue}, ${colorValue}, ${alpha})`;
-                        
-                        platforms.push(new Platform(x, y, platformWidth, platformHeight, color));
+                        // Ensure minimum platform size for better navigability
+                        if (platformWidth >= gridSize && platformHeight >= gridSize) {
+                            // Use darker, more opaque color for better visibility
+                            const alpha = 0.7; // Increased from 0.4 to 0.7 for better visibility
+                            const colorValue = Math.floor(avgBrightness * 0.6); // Darker shade
+                            const color = `rgba(${colorValue}, ${colorValue}, ${colorValue}, ${alpha})`;
+                            
+                            platforms.push(new Platform(x, y, platformWidth, platformHeight, color));
+                        }
                     }
                 }
             }
 
-            // Add a ground platform at the bottom (semi-transparent)
-            platforms.push(new Platform(0, height - 20, width, 20, 'rgba(139, 69, 19, 0.5)'));
+            // Add a ground platform at the bottom (darker and more opaque)
+            platforms.push(new Platform(0, height - 20, width, 20, 'rgba(100, 60, 20, 0.8)'));
 
-            // Add starting platform (semi-transparent)
-            platforms.push(new Platform(0, height - 60, 100, 20, 'rgba(139, 69, 19, 0.5)'));
+            // Add starting platform (green to indicate start, larger and clearer)
+            const startPlatformY = height - 60;
+            platforms.push(new Platform(10, startPlatformY, 100, 20, 'rgba(0, 180, 0, 0.9)'));
 
-            // Initialize player
-            player = new Player(50, height - 100);
+            // Add goal at top-right corner of the level
+            const goalX = width - 50;
+            const goalY = 20;
+            // Add a platform for the goal to sit on (golden and more visible)
+            platforms.push(new Platform(goalX - 10, goalY + 30, 50, 20, 'rgba(255, 200, 0, 0.9)'));
+            goal = new Goal(goalX, goalY);
+
+            // Initialize player ON the start platform (not above it)
+            playerSpawnY = startPlatformY - 20; // Player height is 20, so spawn on top of platform
+            player = new Player(PLAYER_SPAWN_X, playerSpawnY);
+            
+            // Remove any photo-generated platforms that overlap with player spawn area
+            // to ensure player never spawns inside a block
+            const spawnCheckX = PLAYER_SPAWN_X - 10;
+            const spawnCheckY = playerSpawnY - 10;
+            const spawnCheckWidth = 40;  // Player width + buffer
+            const spawnCheckHeight = 40; // Player height + buffer
+            
+            platforms = platforms.filter(platform => {
+                // Keep special platforms (ground, start, goal)
+                if (platform.color.includes('100, 60, 20') || // ground
+                    platform.color.includes('0, 180, 0') ||   // start
+                    platform.color.includes('255, 200, 0')) { // goal
+                    return true;
+                }
+                // Remove platforms that overlap with spawn area
+                const overlaps = !(platform.x + platform.width < spawnCheckX ||
+                                 platform.x > spawnCheckX + spawnCheckWidth ||
+                                 platform.y + platform.height < spawnCheckY ||
+                                 platform.y > spawnCheckY + spawnCheckHeight);
+                return !overlaps;
+            });
 
             // Start game
             startGame();
@@ -632,6 +803,7 @@
         // Start the game loop
         function startGame() {
             gameRunning = true;
+            gameWon = false;  // Reset win state
             canvas.style.display = 'block';
             gameInfo.style.display = 'block';
             resetBtn.style.display = 'inline-block';
@@ -658,15 +830,34 @@
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
 
+            // Update and draw goal
+            if (goal) {
+                goal.update();
+                goal.draw();
+            }
+
             // Update and draw platforms
             for (let platform of platforms) {
                 platform.draw();
             }
 
             // Update and draw player
-            if (player) {
+            if (player && !gameWon) {
                 player.update();
                 player.draw();
+                
+                // Check if player reached the goal
+                if (goal && goal.checkCollision(player)) {
+                    gameWon = true;
+                }
+            } else if (player && gameWon) {
+                // Just draw the player when game is won, don't update
+                player.draw();
+            }
+
+            // Draw win message if game is won
+            if (gameWon) {
+                drawWinMessage();
             }
 
             // Update time
@@ -676,11 +867,26 @@
             requestAnimationFrame(gameLoop);
         }
 
+        // Draw win message overlay
+        function drawWinMessage() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(0, canvas.height / 2 - 50, canvas.width, 100);
+            ctx.fillStyle = '#FFD700';
+            ctx.font = 'bold 36px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('🎉 YOU WIN! 🎉', canvas.width / 2, canvas.height / 2);
+            ctx.font = '20px Arial';
+            ctx.fillStyle = '#FFF';
+            ctx.fillText(`Time: ${Math.floor((Date.now() - startTime) / 1000)}s`, canvas.width / 2, canvas.height / 2 + 30);
+        }
+
         // Reset game
         function resetGame() {
             gameRunning = false;
+            gameWon = false;
             platforms = [];
             player = null;
+            goal = null;  // Clear goal
             score = 0;
             backgroundImage = null; // Clear background image
             canvas.style.display = 'none';
@@ -926,6 +1132,14 @@
         // Keyboard controls
         document.addEventListener('keydown', (e) => {
             if (shouldIgnoreGameKeyEvent(e)) return;
+            
+            // Manual respawn with 'R' key
+            if ((e.key === 'r' || e.key === 'R') && player && gameRunning) {
+                player.respawn();
+                e.preventDefault();
+                return;
+            }
+            
             keys[e.key] = true;
             // Prevent default for arrow keys and space
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
