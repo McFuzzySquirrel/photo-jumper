@@ -386,6 +386,14 @@
         const GRID_SIZE = 40;  // Increased from 20 to create gaps for jumping
         const BRIGHTNESS_THRESHOLD = 128;
         const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        
+        // Player spawn and reserved area constants
+        const PLAYER_SPAWN_X = 40;
+        const PLAYER_SPAWN_Y_OFFSET = 100; // Pixels above canvas bottom
+        const START_AREA_WIDTH = 120;
+        const START_AREA_HEIGHT = 80;
+        const GOAL_AREA_WIDTH = 100;
+        const GOAL_AREA_HEIGHT = 80;
 
         let gameRunning = false;
         let platforms = [];
@@ -516,8 +524,8 @@
             }
 
             respawn() {
-                this.x = 40;  // Match initial spawn position
-                this.y = canvas.height - 100;
+                this.x = PLAYER_SPAWN_X;
+                this.y = canvas.height - PLAYER_SPAWN_Y_OFFSET;
                 this.velocityX = 0;
                 this.velocityY = 0;
                 score = Math.max(0, score - 10);
@@ -715,8 +723,8 @@
                     const isEdge = hasEdge(x, y, width, height, data);
                     
                     // Reserve start area (bottom-left) and goal area (top-right) - don't generate platforms there
-                    const isStartArea = (x < 120 && y > height - 80);
-                    const isGoalArea = (x > width - 100 && y < 80);
+                    const isStartArea = (x < START_AREA_WIDTH && y > height - START_AREA_HEIGHT);
+                    const isGoalArea = (x > width - GOAL_AREA_WIDTH && y < GOAL_AREA_HEIGHT);
                     
                     if (!isStartArea && !isGoalArea && (avgBrightness < brightnessThreshold || (isEdge && avgBrightness < 180))) {
                         const platformWidth = Math.min(gridSize, width - x);
@@ -749,7 +757,7 @@
             goal = new Goal(goalX, goalY);
 
             // Initialize player on the start platform
-            player = new Player(40, height - 100);
+            player = new Player(PLAYER_SPAWN_X, height - PLAYER_SPAWN_Y_OFFSET);
 
             // Start game
             startGame();
