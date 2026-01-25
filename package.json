@@ -5,7 +5,8 @@
   "description": "Photo Jumper - serve the game on your LAN and collect local feedback",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "feedback:issues": "node scripts/feedback-to-issues.js"
   },
   "dependencies": {
     "express": "^4.18.2"
