@@ -404,8 +404,8 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.width = 30;
-                this.height = 30;
+                this.width = 20;  // Reduced from 30 to fit through gaps
+                this.height = 20; // Reduced from 30 to fit through gaps
                 this.velocityX = 0;
                 this.velocityY = 0;
                 this.speed = 5;
@@ -564,6 +564,15 @@
             return pixelCount > 0 ? totalBrightness / pixelCount : 128;
         }
 
+        // Helper function to create platform color with good contrast and gradient effect
+        function getPlatformColor(avgBrightness) {
+            // Make platforms darker for visibility, with gradient from darker to lighter
+            // Use a brown/dark color that contrasts well with most backgrounds
+            const baseDarkness = Math.max(0, Math.min(100, avgBrightness * 0.4)); // Darken to 40% of original
+            const alpha = 0.7; // Increased opacity for better visibility
+            return `rgba(${baseDarkness}, ${baseDarkness * 0.7}, ${baseDarkness * 0.5}, ${alpha})`;
+        }
+
         // Process image and create platforms
         function processImage(image) {
             // Store the image for background rendering
@@ -657,11 +666,7 @@
                             
                             // Get average brightness for color
                             const avgBrightness = calculateAverageBrightness(data, x, y, platformWidth, platformHeight, width, height);
-                            
-                            // Use semi-transparent color so photo shows through
-                            const alpha = 0.4;
-                            const colorValue = Math.floor(avgBrightness);
-                            const color = `rgba(${colorValue}, ${colorValue}, ${colorValue}, ${alpha})`;
+                            const color = getPlatformColor(avgBrightness);
                             
                             platforms.push(new Platform(x, y, platformWidth, platformHeight, color));
                         }
@@ -679,21 +684,18 @@
                         const platformHeight = gridSize;
                         
                         const avgBrightness = calculateAverageBrightness(data, x, y, platformWidth, platformHeight, width, height);
-                        
-                        const alpha = 0.4;
-                        const colorValue = Math.floor(avgBrightness);
-                        const color = `rgba(${colorValue}, ${colorValue}, ${colorValue}, ${alpha})`;
+                        const color = getPlatformColor(avgBrightness);
                         
                         platforms.push(new Platform(x, y, platformWidth, platformHeight, color));
                     }
                 }
             }
 
-            // Add a ground platform at the bottom (semi-transparent)
-            platforms.push(new Platform(0, height - 20, width, 20, 'rgba(139, 69, 19, 0.5)'));
+            // Add a ground platform at the bottom (more opaque for visibility)
+            platforms.push(new Platform(0, height - 20, width, 20, 'rgba(101, 67, 33, 0.8)'));
 
-            // Add starting platform (semi-transparent)
-            platforms.push(new Platform(0, height - 60, 100, 20, 'rgba(139, 69, 19, 0.5)'));
+            // Add starting platform (more opaque for visibility)
+            platforms.push(new Platform(0, height - 60, 100, 20, 'rgba(101, 67, 33, 0.8)'));
 
             // Initialize player
             player = new Player(50, height - 100);
