@@ -385,7 +385,7 @@
         const GRID_SIZE = 20;
         const BRIGHTNESS_THRESHOLD = 128;
         const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-        const MAX_PLATFORM_THICKNESS = 2; // Maximum platform thickness in blocks
+        const MAX_PLATFORM_THICKNESS = 2; // Maximum platform thickness in blocks (currently set to 1 block in implementation)
         const EDGE_THRESHOLD = 30; // Threshold for edge detection
 
         let gameRunning = false;
@@ -548,6 +548,22 @@
             }
         }
 
+        // Helper function to calculate average brightness for a platform area
+        function calculateAverageBrightness(data, x, y, width, height, imageWidth, imageHeight) {
+            let totalBrightness = 0;
+            let pixelCount = 0;
+            for (let py = 0; py < height && y + py < imageHeight; py++) {
+                for (let px = 0; px < width && x + px < imageWidth; px++) {
+                    const i = ((y + py) * imageWidth + (x + px)) * 4;
+                    if (i < data.length) {
+                        totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
+                        pixelCount++;
+                    }
+                }
+            }
+            return pixelCount > 0 ? totalBrightness / pixelCount : 128;
+        }
+
         // Process image and create platforms
         function processImage(image) {
             // Store the image for background rendering
@@ -640,18 +656,7 @@
                             const platformHeight = gridSize;
                             
                             // Get average brightness for color
-                            let totalBrightness = 0;
-                            let pixelCount = 0;
-                            for (let py = 0; py < platformHeight && y + py < height; py++) {
-                                for (let px = 0; px < platformWidth && x + px < width; px++) {
-                                    const i = ((y + py) * width + (x + px)) * 4;
-                                    if (i < data.length) {
-                                        totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
-                                        pixelCount++;
-                                    }
-                                }
-                            }
-                            const avgBrightness = pixelCount > 0 ? totalBrightness / pixelCount : 128;
+                            const avgBrightness = calculateAverageBrightness(data, x, y, platformWidth, platformHeight, width, height);
                             
                             // Use semi-transparent color so photo shows through
                             const alpha = 0.4;
@@ -673,18 +678,7 @@
                         // Platform height is 1 block (gridSize), which satisfies the max 2 blocks requirement
                         const platformHeight = gridSize;
                         
-                        let totalBrightness = 0;
-                        let pixelCount = 0;
-                        for (let py = 0; py < platformHeight && y + py < height; py++) {
-                            for (let px = 0; px < platformWidth && x + px < width; px++) {
-                                const i = ((y + py) * width + (x + px)) * 4;
-                                if (i < data.length) {
-                                    totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
-                                    pixelCount++;
-                                }
-                            }
-                        }
-                        const avgBrightness = pixelCount > 0 ? totalBrightness / pixelCount : 128;
+                        const avgBrightness = calculateAverageBrightness(data, x, y, platformWidth, platformHeight, width, height);
                         
                         const alpha = 0.4;
                         const colorValue = Math.floor(avgBrightness);
