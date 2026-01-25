@@ -398,6 +398,9 @@
         let touchStartY = 0;
         let touchJumping = false;
         let backgroundImage = null; // Store the uploaded photo for background
+        let gameWon = false; // Track if player has won
+        let winTime = 0; // Time when player won
+        let goalX = 0; // X position of the goal
 
         // Player class
         class Player {
@@ -546,6 +549,65 @@
                 ctx.lineWidth = 2;
                 ctx.strokeRect(this.x, this.y, this.width, this.height);
             }
+        }
+
+        // Draw start marker (flag)
+        function drawStartMarker() {
+            const x = 20;
+            const y = canvas.height - 130;
+            
+            // Draw pole
+            ctx.fillStyle = '#444';
+            ctx.fillRect(x, y, 3, 60);
+            
+            // Draw flag
+            ctx.fillStyle = '#00ff00';
+            ctx.beginPath();
+            ctx.moveTo(x + 3, y);
+            ctx.lineTo(x + 30, y + 10);
+            ctx.lineTo(x + 3, y + 20);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            // Draw "START" text
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 10px Arial';
+            ctx.fillText('START', x - 5, y + 75);
+        }
+
+        // Draw end marker (goal flag)
+        function drawGoalMarker() {
+            const x = goalX;
+            const y = canvas.height - 130;
+            
+            // Draw pole
+            ctx.fillStyle = '#444';
+            ctx.fillRect(x, y, 3, 60);
+            
+            // Draw checkered flag pattern
+            const flagWidth = 30;
+            const flagHeight = 20;
+            const checkSize = 5;
+            
+            for (let row = 0; row < flagHeight / checkSize; row++) {
+                for (let col = 0; col < flagWidth / checkSize; col++) {
+                    ctx.fillStyle = (row + col) % 2 === 0 ? '#fff' : '#000';
+                    ctx.fillRect(x + 3 + col * checkSize, y + row * checkSize, checkSize, checkSize);
+                }
+            }
+            
+            // Border for flag
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x + 3, y, flagWidth, flagHeight);
+            
+            // Draw "FINISH" text
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 10px Arial';
+            ctx.fillText('FINISH', x - 8, y + 75);
         }
 
         // Helper function to calculate average brightness for a platform area
@@ -697,8 +759,18 @@
             // Add starting platform (more opaque for visibility)
             platforms.push(new Platform(0, height - 60, 100, 20, 'rgba(101, 67, 33, 0.8)'));
 
+            // Add an ending platform on the right side (more opaque for visibility)
+            platforms.push(new Platform(width - 100, height - 60, 100, 20, 'rgba(101, 67, 33, 0.8)'));
+
+            // Set goal position (finish line)
+            goalX = width - 50;
+
             // Initialize player
             player = new Player(50, height - 100);
+
+            // Reset win state
+            gameWon = false;
+            winTime = 0;
 
             // Start game
             startGame();
@@ -738,15 +810,41 @@
                 platform.draw();
             }
 
+            // Draw start and goal markers
+            drawStartMarker();
+            drawGoalMarker();
+
             // Update and draw player
             if (player) {
                 player.update();
                 player.draw();
+                
+                // Check if player reached the goal
+                if (!gameWon && player.x + player.width >= goalX) {
+                    gameWon = true;
+                    winTime = Math.floor((Date.now() - startTime) / 1000);
+                    
+                    // Display win message
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(0, canvas.height / 2 - 60, canvas.width, 120);
+                    ctx.fillStyle = '#FFD700';
+                    ctx.font = 'bold 48px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('YOU WIN!', canvas.width / 2, canvas.height / 2);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '24px Arial';
+                    ctx.fillText(`Time: ${winTime}s`, canvas.width / 2, canvas.height / 2 + 40);
+                    ctx.textAlign = 'left';
+                }
             }
 
-            // Update time
-            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-            timeElement.textContent = elapsedTime;
+            // Update time (stop if won)
+            if (gameWon) {
+                timeElement.textContent = winTime;
+            } else {
+                const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                timeElement.textContent = elapsedTime;
+            }
 
             requestAnimationFrame(gameLoop);
         }
@@ -758,6 +856,8 @@
             player = null;
             score = 0;
             backgroundImage = null; // Clear background image
+            gameWon = false; // Reset win state
+            winTime = 0;
             canvas.style.display = 'none';
             gameInfo.style.display = 'none';
             resetBtn.style.display = 'none';
