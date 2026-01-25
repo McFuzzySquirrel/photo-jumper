@@ -1,3 +1,23 @@
+ Exploring Ideas Through Code: One Experiment at a Time
+
+## About These Projects
+
+All of my projects exist for one main reason: **learning through experimentation**.  
+Each repository is a result of me asking questions like:  
+> “Is this possible?”  
+> “I wonder if…?”  
+
+Sometimes they’re attempts to solve real problems I’ve come across, other times they’re just me following curiosity down a rabbit hole.  
+This is my **learning playground**, a space where I test ideas, try new things, and learn by doing.  
+
+I share them here in case they help or inspire someone else.  
+So expect some projects to be **messy**, others **well-structured**, all of them are honest reflections of learning in progress.  
+
+Feel free to **use**, **modify**, or **build on** anything here. 
+
+So here we go:
+
+
 # Photo Jumper 🎮
 
 A web-based platform jumping game that converts your photos into playable levels!
@@ -30,6 +50,8 @@ A web-based platform jumping game that converts your photos into playable levels
 
 Simply open `index.html` in any modern web browser. No installation or build process required!
 
+Note: the in-game feedback form requires running the local server (below). If you open the file directly (`file://`), gameplay works but feedback submission will not.
+
 Alternatively, you can serve it with a local web server:
 
 ```bash
@@ -44,6 +66,63 @@ npx http-server -p 8080
 ```
 
 Then navigate to `http://localhost:8080` in your browser.
+
+## LAN Server + Feedback (Offline)
+
+If you want other people on your WiFi/LAN (mobile/tablet/computer) to access the game over HTTP *and* send feedback, run the included local server (requires Node.js + npm).
+
+```bash
+cd photo-jumper
+npm install
+npm start
+```
+
+By default it listens on `0.0.0.0:8080` so other devices can reach it.
+
+1. Find your LAN IP (for example `192.168.x.x` or `10.x.x.x`)
+2. On another device on the same network, open:
+  - `http://<your-lan-ip>:8080/`
+
+Tip (Linux): you can often get your LAN IP with:
+
+```bash
+hostname -I | awk '{print $1}'
+```
+
+Feedback is text-only and stored locally (daily rotated) in `feedback/YYYY-MM-DD.jsonl`.
+
+In the game UI:
+- Use the **Feedback** button to send feedback (message + device type).
+- Use the **Share link** panel to copy the current URL. If it shows `localhost`, replace it with your LAN IP when sharing to other devices.
+
+### Optional access code
+
+If you want to require an access code to submit feedback:
+
+```bash
+FEEDBACK_TOKEN=your-code-here npm start
+```
+
+When the token is enabled, the web UI will prompt for the access code the first time someone submits feedback (it will be remembered on that device).
+
+### Configuration
+
+Environment variables (optional):
+- `PORT` (default: `8080`)
+- `HOST` (default: `0.0.0.0`)
+- `FEEDBACK_TOKEN` (default: empty)
+
+### Firewall note
+
+If other devices can't connect, you may need to allow the port in your firewall (example for UFW):
+
+```bash
+sudo ufw allow 8080/tcp
+```
+
+## Architecture Decisions
+
+Architecture Decision Records are tracked in [docs/adr/README.md](docs/adr/README.md).
 
 ## How It Works
 
