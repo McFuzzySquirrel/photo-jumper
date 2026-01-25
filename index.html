@@ -204,6 +204,7 @@
         let touchStartX = 0;
         let touchStartY = 0;
         let touchJumping = false;
+        let backgroundImage = null; // Store the uploaded photo for background
 
         // Player class
         class Player {
@@ -311,8 +312,18 @@
             }
 
             draw() {
+                // Draw shadow/outline for better visibility on photo
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.fillRect(this.x + 2, this.y + 2, this.width, this.height);
+                
+                // Draw main body
                 ctx.fillStyle = '#ff4444';
                 ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // Draw border for visibility
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
                 
                 // Draw eyes
                 ctx.fillStyle = 'white';
@@ -346,6 +357,9 @@
 
         // Process image and create platforms
         function processImage(image) {
+            // Store the image for background rendering
+            backgroundImage = image;
+
             // Set canvas size based on image aspect ratio
             const maxWidth = 800;
             const maxHeight = 600;
@@ -401,20 +415,21 @@
                         const platformWidth = Math.min(gridSize, width - x);
                         const platformHeight = Math.min(gridSize, height - y);
                         
-                        // Color based on brightness
+                        // Use semi-transparent color so photo shows through
+                        const alpha = 0.4; // 40% opacity
                         const colorValue = Math.floor(avgBrightness);
-                        const color = `rgb(${colorValue}, ${colorValue}, ${colorValue})`;
+                        const color = `rgba(${colorValue}, ${colorValue}, ${colorValue}, ${alpha})`;
                         
                         platforms.push(new Platform(x, y, platformWidth, platformHeight, color));
                     }
                 }
             }
 
-            // Add a ground platform at the bottom
-            platforms.push(new Platform(0, height - 20, width, 20, '#8B4513'));
+            // Add a ground platform at the bottom (semi-transparent)
+            platforms.push(new Platform(0, height - 20, width, 20, 'rgba(139, 69, 19, 0.5)'));
 
-            // Add starting platform
-            platforms.push(new Platform(0, height - 60, 100, 20, '#8B4513'));
+            // Add starting platform (semi-transparent)
+            platforms.push(new Platform(0, height - 60, 100, 20, 'rgba(139, 69, 19, 0.5)'));
 
             // Initialize player
             player = new Player(50, height - 100);
@@ -443,9 +458,14 @@
         function gameLoop() {
             if (!gameRunning) return;
 
-            // Clear canvas
-            ctx.fillStyle = '#87ceeb';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Draw the photo as background instead of solid color
+            if (backgroundImage) {
+                ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+            } else {
+                // Fallback to sky blue if no image
+                ctx.fillStyle = '#87ceeb';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
 
             // Update and draw platforms
             for (let platform of platforms) {
@@ -471,6 +491,7 @@
             platforms = [];
             player = null;
             score = 0;
+            backgroundImage = null; // Clear background image
             canvas.style.display = 'none';
             gameInfo.style.display = 'none';
             resetBtn.style.display = 'none';

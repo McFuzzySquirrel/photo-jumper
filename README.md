@@ -6,6 +6,7 @@ A web-based platform jumping game that converts your photos into playable levels
 
 - 📸 **Photo Upload**: Upload a photo from your device or take one with your camera
 - 🎨 **Dynamic Level Generation**: Photos are automatically converted into platforms based on brightness
+- 🖼️ **Photo Background**: Your photo is displayed as the game background, making you feel like you're playing inside the picture
 - 🎮 **Classic Platform Gameplay**: Jump and navigate through your photo-based levels
 - 🕹️ **Multiple Control Options**:
   - Keyboard: Arrow Keys or WASD to move, Space/Up Arrow to jump
@@ -49,8 +50,10 @@ Then navigate to `http://localhost:8080` in your browser.
 The game uses HTML5 Canvas to:
 1. Process uploaded images and analyze brightness levels
 2. Generate platforms from darker areas of the image
-3. Render a physics-based platform game with gravity and collision detection
-4. Support both keyboard and touch input for cross-platform compatibility
+3. Display the original photo as the game background
+4. Render semi-transparent platforms with visible borders so you can see the photo beneath
+5. Apply physics-based platform game mechanics with gravity and collision detection
+6. Support both keyboard and touch input for cross-platform compatibility
 
 ## Browser Compatibility
 
