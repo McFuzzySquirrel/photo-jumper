@@ -521,14 +521,14 @@
                 ctx.lineWidth = 2;
                 ctx.strokeRect(this.x, this.y, this.width, this.height);
                 
-                // Draw eyes
+                // Draw eyes (adjusted for 20px player size)
                 ctx.fillStyle = 'white';
-                ctx.fillRect(this.x + 8, this.y + 8, 6, 6);
-                ctx.fillRect(this.x + 16, this.y + 8, 6, 6);
+                ctx.fillRect(this.x + 4, this.y + 6, 5, 5);  // Left eye
+                ctx.fillRect(this.x + 11, this.y + 6, 5, 5); // Right eye (fits within 20px width)
                 
                 ctx.fillStyle = 'black';
-                ctx.fillRect(this.x + 10, this.y + 10, 3, 3);
-                ctx.fillRect(this.x + 18, this.y + 10, 3, 3);
+                ctx.fillRect(this.x + 5, this.y + 7, 3, 3);  // Left pupil
+                ctx.fillRect(this.x + 12, this.y + 7, 3, 3); // Right pupil
             }
         }
 
@@ -834,7 +834,6 @@
                     ctx.fillStyle = '#fff';
                     ctx.font = '24px Arial';
                     ctx.fillText(`Time: ${winTime}s`, canvas.width / 2, canvas.height / 2 + 40);
-                    ctx.textAlign = 'left';
                 }
             }
 
