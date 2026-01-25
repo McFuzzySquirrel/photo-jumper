@@ -744,6 +744,15 @@
             });
         }
 
+        function shouldIgnoreGameKeyEvent(e) {
+            if (feedbackModal.classList.contains('open')) return true;
+            const target = e.target;
+            if (!target) return false;
+            if (target.isContentEditable) return true;
+            const tag = (target.tagName || '').toUpperCase();
+            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+        }
+
         function updateLanHint() {
             if (location.protocol === 'file:') {
                 lanHint.classList.remove('open');
@@ -916,6 +925,7 @@
 
         // Keyboard controls
         document.addEventListener('keydown', (e) => {
+            if (shouldIgnoreGameKeyEvent(e)) return;
             keys[e.key] = true;
             // Prevent default for arrow keys and space
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
@@ -924,6 +934,7 @@
         });
 
         document.addEventListener('keyup', (e) => {
+            if (shouldIgnoreGameKeyEvent(e)) return;
             keys[e.key] = false;
         });
 
