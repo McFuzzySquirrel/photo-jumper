@@ -385,6 +385,8 @@
         const GRID_SIZE = 20;
         const BRIGHTNESS_THRESHOLD = 128;
         const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        const MAX_PLATFORM_THICKNESS = 2; // Maximum platform thickness in blocks
+        const EDGE_THRESHOLD = 30; // Threshold for edge detection
 
         let gameRunning = false;
         let platforms = [];
@@ -576,38 +578,118 @@
             const imageData = previewCtx.getImageData(0, 0, width, height);
             const data = imageData.data;
 
-            // Create platforms based on brightness
+            // Create platforms based on horizontal edge detection
             platforms = [];
             const gridSize = GRID_SIZE;
-            const brightnessThreshold = BRIGHTNESS_THRESHOLD;
-
-            for (let y = 0; y < height; y += gridSize) {
+            
+            // First, detect horizontal edges using a simplified Sobel filter
+            const edgeMap = new Array(Math.ceil(height / gridSize));
+            for (let i = 0; i < edgeMap.length; i++) {
+                edgeMap[i] = new Array(Math.ceil(width / gridSize)).fill(0);
+            }
+            
+            // Calculate edge strength for each grid cell using horizontal gradient
+            for (let y = gridSize; y < height - gridSize; y += gridSize) {
                 for (let x = 0; x < width; x += gridSize) {
-                    let totalBrightness = 0;
-                    let pixelCount = 0;
-
-                    // Calculate average brightness of grid cell
-                    for (let dy = 0; dy < gridSize && y + dy < height; dy++) {
-                        for (let dx = 0; dx < gridSize && x + dx < width; dx++) {
-                            const i = ((y + dy) * width + (x + dx)) * 4;
-                            const r = data[i];
-                            const g = data[i + 1];
-                            const b = data[i + 2];
-                            const brightness = (r + g + b) / 3;
-                            totalBrightness += brightness;
-                            pixelCount++;
+                    let edgeStrength = 0;
+                    let sampleCount = 0;
+                    
+                    // Sample points in the grid cell
+                    for (let dx = 0; dx < gridSize && x + dx < width; dx += 4) {
+                        const i = ((y - gridSize) * width + (x + dx)) * 4; // pixel above
+                        const i2 = ((y + gridSize) * width + (x + dx)) * 4; // pixel below
+                        
+                        if (i2 < data.length) {
+                            // Calculate brightness difference (vertical gradient)
+                            const brightAbove = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                            const brightBelow = (data[i2] + data[i2 + 1] + data[i2 + 2]) / 3;
+                            edgeStrength += Math.abs(brightAbove - brightBelow);
+                            sampleCount++;
                         }
                     }
-
-                    const avgBrightness = totalBrightness / pixelCount;
-
-                    // Create platform if brightness is below threshold (darker areas)
-                    if (avgBrightness < brightnessThreshold) {
-                        const platformWidth = Math.min(gridSize, width - x);
-                        const platformHeight = Math.min(gridSize, height - y);
+                    
+                    if (sampleCount > 0) {
+                        const avgEdge = edgeStrength / sampleCount;
+                        const gridY = Math.floor(y / gridSize);
+                        const gridX = Math.floor(x / gridSize);
+                        if (gridY < edgeMap.length && gridX < edgeMap[0].length) {
+                            edgeMap[gridY][gridX] = avgEdge;
+                        }
+                    }
+                }
+            }
+            
+            // Create platforms where horizontal edges are detected
+            // Group consecutive edge cells into platforms, limiting thickness to MAX_PLATFORM_THICKNESS
+            for (let gridY = 0; gridY < edgeMap.length; gridY++) {
+                let platformStart = -1;
+                let platformThickness = 0;
+                
+                for (let gridX = 0; gridX < edgeMap[0].length; gridX++) {
+                    const isEdge = edgeMap[gridY][gridX] > EDGE_THRESHOLD;
+                    
+                    if (isEdge && platformStart === -1) {
+                        // Start a new potential platform
+                        platformStart = gridX;
+                        platformThickness = 1;
+                    } else if (isEdge && platformStart !== -1) {
+                        // Continue the platform horizontally (same row)
+                    } else if (!isEdge && platformStart !== -1) {
+                        // End of platform - create it if it's wide enough
+                        const platformWidth = (gridX - platformStart) * gridSize;
+                        if (platformWidth >= gridSize) {
+                            const x = platformStart * gridSize;
+                            const y = gridY * gridSize;
+                            // Limit height to MAX_PLATFORM_THICKNESS blocks
+                            const platformHeight = Math.min(gridSize * MAX_PLATFORM_THICKNESS, gridSize);
+                            
+                            // Get average brightness for color
+                            let totalBrightness = 0;
+                            let pixelCount = 0;
+                            for (let py = 0; py < platformHeight && y + py < height; py++) {
+                                for (let px = 0; px < platformWidth && x + px < width; px++) {
+                                    const i = ((y + py) * width + (x + px)) * 4;
+                                    if (i < data.length) {
+                                        totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
+                                        pixelCount++;
+                                    }
+                                }
+                            }
+                            const avgBrightness = pixelCount > 0 ? totalBrightness / pixelCount : 128;
+                            
+                            // Use semi-transparent color so photo shows through
+                            const alpha = 0.4;
+                            const colorValue = Math.floor(avgBrightness);
+                            const color = `rgba(${colorValue}, ${colorValue}, ${colorValue}, ${alpha})`;
+                            
+                            platforms.push(new Platform(x, y, platformWidth, platformHeight, color));
+                        }
+                        platformStart = -1;
+                    }
+                }
+                
+                // Handle platform extending to edge of image
+                if (platformStart !== -1) {
+                    const platformWidth = (edgeMap[0].length - platformStart) * gridSize;
+                    if (platformWidth >= gridSize) {
+                        const x = platformStart * gridSize;
+                        const y = gridY * gridSize;
+                        const platformHeight = Math.min(gridSize * MAX_PLATFORM_THICKNESS, gridSize);
                         
-                        // Use semi-transparent color so photo shows through
-                        const alpha = 0.4; // 40% opacity
+                        let totalBrightness = 0;
+                        let pixelCount = 0;
+                        for (let py = 0; py < platformHeight && y + py < height; py++) {
+                            for (let px = 0; px < platformWidth && x + px < width; px++) {
+                                const i = ((y + py) * width + (x + px)) * 4;
+                                if (i < data.length) {
+                                    totalBrightness += (data[i] + data[i + 1] + data[i + 2]) / 3;
+                                    pixelCount++;
+                                }
+                            }
+                        }
+                        const avgBrightness = pixelCount > 0 ? totalBrightness / pixelCount : 128;
+                        
+                        const alpha = 0.4;
                         const colorValue = Math.floor(avgBrightness);
                         const color = `rgba(${colorValue}, ${colorValue}, ${colorValue}, ${alpha})`;
                         
