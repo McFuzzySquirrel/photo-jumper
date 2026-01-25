@@ -91,6 +91,39 @@ hostname -I | awk '{print $1}'
 
 Feedback is text-only and stored locally (daily rotated) in `feedback/YYYY-MM-DD.jsonl`.
 
+## Triage Feedback → GitHub Issues (Interactive)
+
+To turn selected feedback entries into GitHub issues (one-by-one, step-through), use the included interactive triage script.
+
+Prereqs:
+- GitHub CLI installed (`gh`)
+- Authenticated (`gh auth login`)
+- Run from inside this repo so it can auto-detect the target repo from the git remote
+
+Run:
+
+```bash
+npm run feedback:issues
+```
+
+Notes:
+- The script **auto-creates missing labels** (minimal set: `feedback`, `needs-triage`, and `device: ...`).
+- For privacy, issues **never include IP or User-Agent**, even though the local logs contain them.
+- Each created issue includes a hidden dedupe marker like `<!-- pj-feedback-id: ... -->` so reruns can detect duplicates.
+
+Common overrides:
+
+```bash
+# Use a specific feedback file
+npm run feedback:issues -- feedback/2026-01-25.jsonl
+
+# Use a specific repo (override git remote detection)
+npm run feedback:issues -- --repo McFuzzySquirrel/photo-jumper
+
+# Preview only (no labels/issues created)
+npm run feedback:issues -- --dry-run
+```
+
 In the game UI:
 - Use the **Feedback** button to send feedback (message + device type).
 - Use the **Share link** panel to copy the current URL. If it shows `localhost`, replace it with your LAN IP when sharing to other devices.
