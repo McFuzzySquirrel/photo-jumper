@@ -33,7 +33,7 @@ So, it works but there is room for improvement and that also means I can get bac
 
 To be clear, he is a great critical thinker and curious, but it didn’t give him a chance to apply that - and that could be a problem later. So I am glad we did it together, otherwise I may have missed it.
 
-So this turned out pretty well, I left the game as it was (will share at the end of this), but I added a little local hosting capability with an option to provide feedback (sends to the local server) which we will then plan for and implement/fix.
+So this turned out pretty well, I left the game as it was (this repo), but I added a little local hosting capability with an option to provide feedback (sends to the local server) which we will then plan for and implement/fix.
 
 I have already started getting feedback.
 
