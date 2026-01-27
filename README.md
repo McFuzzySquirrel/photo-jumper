@@ -17,8 +17,33 @@ Feel free to **use**, **modify**, or **build on** anything here.
 
 So here we go:
 
+# What this is
 
-# Photo Jumper 🎮
+It's NOT a fully functional game, yet. What it is, is a base that can be built on using realtime feedback, the aim of which is to enable critical thinking and planning skills to get to a fully working game.
+
+## What sparked this
+
+"It’s both awesome and terrifying at the same time. This morning I am trying to get one of the kids excited about being able to create their own game through the power of AI, the idea is great and my plan was to introduce them to the concept of spec driven development (ok, to a kid that does not sound fun at all). 
+
+So I start by introducing them to the power of repo on GitHub via the web, let’s create it - wait, it’s asking we what I want to build, ok here is the brief outline.
+
+Oh, here’s the game. That’s awesome, but the terrifying bit is that it was too easy, I should have left that blank, because he saw it and it shouldn’t be that easy, he didn’t get the chance to apply some proper planning and critical thinking, although I did take him through its critical thinking and planning.
+
+So, it works but there is room for improvement and that also means I can get back on track with my plan to get him to apply some critical thinking and a good plan.
+
+To be clear, he is a great critical thinker and curious, but it didn’t give him a chance to apply that - and that could be a problem later. So I am glad we did it together, otherwise I may have missed it.
+
+So this turned out pretty well, I left the game as it was (will share at the end of this), but I added a little local hosting capability with an option to provide feedback (sends to the local server) which we will then plan for and implement/fix.
+
+I have already started getting feedback.
+
+Best outcome of all though, was the conversation we had in the car on the way to and from the shops: what he wants to do and how we should think about doing it."
+
+## What's going to happen now (the plan)
+
+So the plan is to create a branch that we will work on, we will do our planning and execution there and critically, we will be creating a "blog" here that captures these discussions as learning-in-progress. Essentially a documented journey of discovery.
+
+# The Original Game Idea: Photo Jumper 🎮
 
 A web-based platform jumping game that converts your photos into playable levels!
 
