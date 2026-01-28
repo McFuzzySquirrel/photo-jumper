@@ -47,6 +47,8 @@ So the plan is to create a branch that we will work on, we will do our planning 
 
 A web-based platform jumping game that converts your photos into playable levels!
 
+→ Follow the development notes on the `learning/journey` branch: [Learning Journey (Branch)](#learning-journey-branch)
+
 ## Features
 
 - 📸 **Photo Upload**: Upload a photo from your device or take one with your camera
@@ -181,6 +183,25 @@ sudo ufw allow 8080/tcp
 ## Architecture Decisions
 
 Architecture Decision Records are tracked in [docs/adr/README.md](docs/adr/README.md).
+
+## Learning Journey (Branch)
+
+If you’re curious about how Photo Jumper evolves, there’s an in-repo learning log on the `learning/journey` branch.
+
+Why it exists:
+- Capture experiments and design reasoning (especially around gameplay fairness)
+- Keep “learning notes” and small iteration docs close to the code
+- Make it easier for others (and future-me) to follow the why, not just the what
+
+What you’ll find there:
+- A lightweight journal in `learning/journey/` (notes, decisions, templates)
+- Work-in-progress thinking that may not belong on `main` yet
+
+How to follow it:
+```bash
+git fetch origin
+git switch learning/journey
+```
 
 ## How It Works
 
