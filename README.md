@@ -24,6 +24,15 @@ A web-based platform jumping game that converts your photos into playable levels
 
 → Follow the development notes on the `learning/journey` branch: [Learning Journey (Branch)](#learning-journey-branch)
 
+### Before / After
+
+| Before (main) | After (learning/journey) |
+| --- | --- |
+| <img src="docs/adr/screenshots/before-main.png" alt="Before (main)" width="360" /> | <img src="docs/adr/screenshots/after-journey.png" alt="After (learning/journey)" width="360" /> |
+
+
+
+
 ## Features
 
 - 📸 **Photo Upload**: Upload a photo from your device or take one with your camera
