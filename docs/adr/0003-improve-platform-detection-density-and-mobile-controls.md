@@ -35,6 +35,11 @@ We will improve playability via two targeted changes:
 
 Additionally, we slightly reduce horizontal “friction” decay to make movement feel more responsive, without changing jump power or gravity.
 
+3. **Add an AI-friendly issue template for gameplay fixes** so incoming feedback can be turned into actionable design briefs:
+   - Provide a GitHub issue template focused on fairness, reachability, and gameplay-first constraints.
+   - Keep blank issues enabled, but guide contributors toward the structured template when reporting gameplay problems.
+   - Ensure the local feedback importer can create issues that follow the same structure (templates are applied only via the GitHub UI).
+
 ## Consequences
 
 ### Positive
@@ -67,4 +72,14 @@ Additionally, we slightly reduce horizontal “friction” decay to make movemen
   - `EDGE_BRIGHTNESS_THRESHOLD`
 - Mobile controls are rendered as a small button row and are wired into existing `keys[...]` and `touchJumping` state.
 - `touchcancel` is handled to avoid “stuck button” behavior.
+
+### Issue workflow
+
+- GitHub issue template: `.github/ISSUE_TEMPLATE/02-ai-fix-request.md`
+   - Captures gameplay-first constraints and acceptance criteria.
+   - Default labels include `needs-triage`, `ai-fix`, `gameplay`, and related categories.
+- Template configuration: `.github/ISSUE_TEMPLATE/config.yml` (keeps blank issues enabled)
+- Feedback importer: `scripts/feedback-to-issues.js`
+   - Creates issues via GitHub API and **generates** the same section structure in the issue body.
+   - Explicitly omits IP/User-Agent from created issues (privacy).
 
