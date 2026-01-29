@@ -173,6 +173,55 @@
             display: none;
         }
 
+        .mobile-controls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 0 20px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .mobile-controls.show {
+            display: flex;
+        }
+
+        .control-btn {
+            background: rgba(102, 126, 234, 0.8);
+            color: white;
+            border: 3px solid rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            width: 70px;
+            height: 70px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: transform 0.1s, background 0.1s;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+            background: rgba(102, 126, 234, 1);
+        }
+
+        .control-btn.left {
+            margin-right: auto;
+        }
+
+        .control-btn.right {
+            margin-left: auto;
+        }
+
         .modal {
             position: fixed;
             inset: 0;
@@ -310,14 +359,20 @@
             <canvas id="previewCanvas" class="preview-canvas"></canvas>
         </div>
 
+        <div class="mobile-controls" id="mobileControls">
+            <button class="control-btn left" id="leftBtn">◀</button>
+            <button class="control-btn right" id="rightBtn">▶</button>
+        </div>
+
         <div class="instructions">
             <h3>How to Play:</h3>
             <p>1. Upload a photo or take one with your camera</p>
             <p>2. The photo will be converted into platforms based on brightness</p>
-            <p>3. Use <strong>Arrow Keys</strong> or <strong>WASD</strong> to move (or touch controls on mobile)</p>
-            <p>4. Press <strong>Space</strong> or <strong>Up Arrow</strong> to jump</p>
-            <p>5. Navigate from the green start platform to the golden goal star!</p>
-            <p>6. Press <strong>R</strong> to respawn if you get stuck</p>
+            <p>3. Use <strong>Arrow Keys</strong> or <strong>WASD</strong> to move</p>
+            <p>4. On mobile: Use <strong>◀ ▶ buttons</strong> to move left/right, tap to jump</p>
+            <p>5. Press <strong>Space</strong> or <strong>Up Arrow</strong> to jump (or tap on mobile)</p>
+            <p>6. Navigate from the green start platform to the golden goal star!</p>
+            <p>7. Press <strong>R</strong> to respawn if you get stuck</p>
         </div>
 
         <div id="feedbackModal" class="modal" aria-hidden="true">
@@ -383,11 +438,11 @@
         const FEEDBACK_TOKEN_STORAGE_KEY = 'photoJumperFeedbackToken';
 
         // Game configuration constants
-        const GRID_SIZE = 30;  // 1.5x player size (20px) for minimum jumping gaps
-        const BRIGHTNESS_THRESHOLD = 128;
+        const GRID_SIZE = 24;  // Reduced from 30 to create more platforms (1.2x player size)
+        const BRIGHTNESS_THRESHOLD = 140;  // Increased from 128 to detect more platforms
         const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-        const EDGE_DETECTION_THRESHOLD = 40;  // Brightness difference for edge detection
-        const EDGE_BRIGHTNESS_THRESHOLD = 180;  // Max brightness for edge-detected platforms
+        const EDGE_DETECTION_THRESHOLD = 35;  // Reduced from 40 for better edge detection
+        const EDGE_BRIGHTNESS_THRESHOLD = 190;  // Increased from 180 to capture more edge platforms
         
         // Player spawn and reserved area constants
         const PLAYER_SPAWN_X = 40;
@@ -814,6 +869,8 @@
             startTime = Date.now();
             scoreElement.textContent = score;
             
+            updateMobileControlsVisibility(); // Show mobile controls if needed
+            
             gameLoop();
         }
 
@@ -894,6 +951,7 @@
             resetBtn.style.display = 'none';
             uploadBtn.style.display = 'inline-block';
             cameraBtn.style.display = 'inline-block';
+            updateMobileControlsVisibility(); // Hide mobile controls
         }
 
         function guessDeviceType() {
@@ -1190,6 +1248,67 @@
             e.preventDefault();
             touchJumping = false;
             keys['ArrowLeft'] = false;
+            keys['ArrowRight'] = false;
+        });
+
+        // Mobile control buttons
+        const mobileControls = document.getElementById('mobileControls');
+        const leftBtn = document.getElementById('leftBtn');
+        const rightBtn = document.getElementById('rightBtn');
+
+        // Show mobile controls on mobile/tablet devices when game is active
+        function updateMobileControlsVisibility() {
+            const deviceType = guessDeviceType();
+            const gameActive = canvas.style.display !== 'none';
+            // Also show controls on small viewports (under 768px) even on desktop for testing
+            const isSmallViewport = window.innerWidth < 768;
+            if ((deviceType === 'mobile' || deviceType === 'tablet' || isSmallViewport) && gameActive) {
+                mobileControls.classList.add('show');
+            } else {
+                mobileControls.classList.remove('show');
+            }
+        }
+
+        // Left button controls
+        leftBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            keys['ArrowLeft'] = true;
+        });
+
+        leftBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            keys['ArrowLeft'] = false;
+        });
+
+        // Right button controls
+        rightBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            keys['ArrowRight'] = true;
+        });
+
+        rightBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            keys['ArrowRight'] = false;
+        });
+
+        // Also handle mouse events for testing on desktop
+        leftBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            keys['ArrowLeft'] = true;
+        });
+
+        leftBtn.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            keys['ArrowLeft'] = false;
+        });
+
+        rightBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            keys['ArrowRight'] = true;
+        });
+
+        rightBtn.addEventListener('mouseup', (e) => {
+            e.preventDefault();
             keys['ArrowRight'] = false;
         });
 
