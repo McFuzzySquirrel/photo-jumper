@@ -28,7 +28,7 @@ A web-based platform jumping game that converts your photos into playable levels
 
 | Before (main) | After (learning/journey) |
 | --- | --- |
-| <img src="docs/adr/screenshots/before-main.png" alt="Before (main)" width="360" /> | <img src="docs/adr/screenshots/after-journey.png" alt="After (learning/journey)" width="360" /> |
+| <img src="docs/adr/screenshots/before-main.png" alt="Before (main)" width="360" /> | <img src="https://github.com/McFuzzySquirrel/photo-jumper/blob/learning/journey/docs/adr/screenshots/after-journey-02.png" alt="After (learning/journey)" width="360" /> |
 
 
 
