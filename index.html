@@ -350,9 +350,9 @@
 
         <!-- Mobile control buttons -->
         <div class="mobile-controls" id="mobileControls">
-            <button class="control-btn" id="leftBtn">◀</button>
-            <button class="control-btn jump-btn" id="jumpBtn">▲</button>
-            <button class="control-btn" id="rightBtn">▶</button>
+            <button class="control-btn" id="leftBtn" aria-label="Move left">◀</button>
+            <button class="control-btn jump-btn" id="jumpBtn" aria-label="Jump">▲</button>
+            <button class="control-btn" id="rightBtn" aria-label="Move right">▶</button>
         </div>
 
         <div class="instructions">
@@ -443,7 +443,7 @@
         const PLAYER_GRAVITY = 0.5;
 
         const GRID_SIZE = 20;  // Reduced from 30 to detect more platforms (1x player size)
-        const BRIGHTNESS_THRESHOLD = 140;  // Increased from 128 to capture more darker areas
+        const BRIGHTNESS_THRESHOLD = 140;  // Increased from 128 to require brighter areas for platforms
         const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
         const EDGE_DETECTION_THRESHOLD = 30;  // Reduced from 40 for better edge detection
         const EDGE_BRIGHTNESS_THRESHOLD = 200;  // Increased from 180 to accept more edge-detected platforms
@@ -1561,6 +1561,10 @@
             e.preventDefault();
             keys['ArrowLeft'] = false;
         });
+        leftBtn.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            keys['ArrowLeft'] = false;
+        });
 
         // Right button
         rightBtn.addEventListener('touchstart', (e) => {
@@ -1571,6 +1575,10 @@
             e.preventDefault();
             keys['ArrowRight'] = false;
         });
+        rightBtn.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            keys['ArrowRight'] = false;
+        });
 
         // Jump button
         jumpBtn.addEventListener('touchstart', (e) => {
@@ -1578,6 +1586,10 @@
             touchJumping = true;
         });
         jumpBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchJumping = false;
+        });
+        jumpBtn.addEventListener('touchcancel', (e) => {
             e.preventDefault();
             touchJumping = false;
         });
