@@ -360,19 +360,18 @@
         </div>
 
         <div class="mobile-controls" id="mobileControls">
-            <button class="control-btn left" id="leftBtn">◀</button>
-            <button class="control-btn right" id="rightBtn">▶</button>
+            <button class="control-btn left" id="leftBtn" aria-label="Move left">◀</button>
+            <button class="control-btn right" id="rightBtn" aria-label="Move right">▶</button>
         </div>
 
         <div class="instructions">
             <h3>How to Play:</h3>
             <p>1. Upload a photo or take one with your camera</p>
             <p>2. The photo will be converted into platforms based on brightness</p>
-            <p>3. Use <strong>Arrow Keys</strong> or <strong>WASD</strong> to move</p>
-            <p>4. On mobile: Use <strong>◀ ▶ buttons</strong> to move left/right, tap to jump</p>
-            <p>5. Press <strong>Space</strong> or <strong>Up Arrow</strong> to jump (or tap on mobile)</p>
-            <p>6. Navigate from the green start platform to the golden goal star!</p>
-            <p>7. Press <strong>R</strong> to respawn if you get stuck</p>
+            <p>3. <strong>Desktop:</strong> Use <strong>Arrow Keys</strong> or <strong>WASD</strong> to move, <strong>Space/Up Arrow</strong> to jump</p>
+            <p>4. <strong>Mobile:</strong> Use <strong>◀ ▶ buttons</strong> to move, <strong>tap</strong> to jump</p>
+            <p>5. Navigate from the green start platform to the golden goal star!</p>
+            <p>6. Press <strong>R</strong> to respawn if you get stuck</p>
         </div>
 
         <div id="feedbackModal" class="modal" aria-hidden="true">
@@ -1280,6 +1279,11 @@
             keys['ArrowLeft'] = false;
         });
 
+        leftBtn.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            keys['ArrowLeft'] = false;
+        });
+
         // Right button controls
         rightBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
@@ -1287,6 +1291,11 @@
         });
 
         rightBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            keys['ArrowRight'] = false;
+        });
+
+        rightBtn.addEventListener('touchcancel', (e) => {
             e.preventDefault();
             keys['ArrowRight'] = false;
         });
@@ -1302,6 +1311,10 @@
             keys['ArrowLeft'] = false;
         });
 
+        leftBtn.addEventListener('mouseleave', (e) => {
+            keys['ArrowLeft'] = false;
+        });
+
         rightBtn.addEventListener('mousedown', (e) => {
             e.preventDefault();
             keys['ArrowRight'] = true;
@@ -1311,6 +1324,13 @@
             e.preventDefault();
             keys['ArrowRight'] = false;
         });
+
+        rightBtn.addEventListener('mouseleave', (e) => {
+            keys['ArrowRight'] = false;
+        });
+
+        // Update mobile controls visibility on window resize
+        window.addEventListener('resize', updateMobileControlsVisibility);
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && feedbackModal.classList.contains('open')) {
