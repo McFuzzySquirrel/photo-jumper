@@ -359,27 +359,58 @@
         }
 
         /* Fullscreen styles */
-        .container.fullscreen {
+        .game-canvas-container.fullscreen {
             position: fixed;
             inset: 0;
-            max-width: 100%;
-            width: 100%;
-            height: 100vh;
-            margin: 0;
-            border-radius: 0;
-            padding: 10px;
-            overflow: auto;
             z-index: 100;
-        }
-
-        .container.fullscreen .game-canvas-container {
-            flex: 1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: flex;
+            flex-direction: column;
+            justify-content: center;
             align-items: center;
+            padding: 10px;
         }
 
-        .container.fullscreen #gameCanvas {
-            max-height: calc(100vh - 150px);
+        .game-canvas-container.fullscreen #gameCanvas {
+            max-width: 95vw;
+            max-height: 95vh;
+            border-radius: 10px;
+        }
+
+        /* Hide non-essential elements when canvas is fullscreen */
+        .game-canvas-container.fullscreen ~ .instructions {
+            display: none;
+        }
+
+        .game-screen:has(.game-canvas-container.fullscreen) .upload-section {
+            display: none;
+        }
+
+        .game-screen:has(.game-canvas-container.fullscreen) h1 {
+            display: none;
+        }
+
+        /* Position game info overlay when fullscreen */
+        .game-canvas-container.fullscreen ~ .game-info,
+        .game-screen:has(.game-canvas-container.fullscreen) .game-info {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 101;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Position mobile controls when fullscreen */
+        .game-canvas-container.fullscreen ~ .mobile-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 101;
         }
 
         /* Exit fullscreen button */
@@ -549,6 +580,7 @@
         const startGameBtn = document.getElementById('startGameBtn');
         const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
         const container = document.querySelector('.container');
+        const gameCanvasContainer = document.querySelector('.game-canvas-container');
         
         const uploadBtn = document.getElementById('uploadBtn');
         const cameraBtn = document.getElementById('cameraBtn');
@@ -1420,14 +1452,14 @@
 
         // Enter fullscreen
         function enterFullscreen() {
-            container.classList.add('fullscreen');
+            gameCanvasContainer.classList.add('fullscreen');
             exitFullscreenBtn.classList.add('visible');
             document.body.style.overflow = 'hidden';
         }
 
         // Exit fullscreen
         function exitFullscreen() {
-            container.classList.remove('fullscreen');
+            gameCanvasContainer.classList.remove('fullscreen');
             exitFullscreenBtn.classList.remove('visible');
             document.body.style.overflow = '';
         }
