@@ -15,3 +15,11 @@ This folder is our shared record of what we discussed, what we decided, and what
 2. Write what we did + what we learned.
 3. Capture any decisions (and why) in `decisions.md`.
 4. End with concrete next steps.
+
+### Interactive helper
+
+You can generate a new note from the template via:
+
+- `npm run learning:note`
+
+This will prompt you for each section and create a new file in `learning/journey/notes/`.
