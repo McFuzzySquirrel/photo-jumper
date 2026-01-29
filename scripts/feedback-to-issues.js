@@ -26,6 +26,7 @@ Options:
   --repo <owner/name>       Override detected repository
   --remote <name>           Git remote to inspect (default: origin)
   --state <path>            State file path (default: feedback/.triage-state.json)
+	--no-template             Use legacy issue body format (default uses AI Fix template sections)
   --dry-run                 Do not create labels/issues (prints what it would do)
   -h, --help                Show help
 
@@ -47,7 +48,8 @@ function parseArgs(argv) {
 		repo: undefined,
 		remote: 'origin',
 		statePath: path.join('feedback', '.triage-state.json'),
-		dryRun: false
+		dryRun: false,
+		useTemplateBody: true
 	};
 
 	const positional = [];
@@ -57,6 +59,10 @@ function parseArgs(argv) {
 		if (a === '-h' || a === '--help') usage(0);
 		if (a === '--dry-run') {
 			args.dryRun = true;
+			continue;
+		}
+		if (a === '--no-template') {
+			args.useTemplateBody = false;
 			continue;
 		}
 		if (a.startsWith('--repo=')) {
@@ -174,6 +180,18 @@ function redactIps(text) {
 	return s;
 }
 
+function sanitizeFeedbackRecordForIssue(record) {
+	// Privacy: never include raw IP or User-Agent in issues.
+	if (!record || typeof record !== 'object') return {};
+	const out = {};
+	for (const [k, v] of Object.entries(record)) {
+		const key = String(k);
+		if (key === 'ip' || key === 'ua' || key === 'userAgent') continue;
+		out[key] = v;
+	}
+	return out;
+}
+
 function makeMarkerId({ ts, deviceType, message }) {
 	const normalized = normalizeMessage(message);
 	const messageHash = sha256Hex(normalized);
@@ -233,6 +251,13 @@ function getMinimalLabels() {
 	return [
 		{ name: 'feedback', color: '1d76db', description: 'Collected from the in-game local feedback form.' },
 		{ name: 'needs-triage', color: 'fbca04', description: 'Needs review and categorization.' },
+		{ name: 'ai-fix', color: '5319e7', description: 'AI/Copilot-friendly fix request (treat as a design brief).' },
+		{ name: 'gameplay', color: '0e8a16', description: 'Gameplay feel, controls, fairness, or level design.' },
+		{ name: 'generation', color: '0052cc', description: 'Photo → platform generation / geometry normalization.' },
+		{ name: 'fairness', color: 'd93f0b', description: 'Unfair difficulty spikes, unclear jumps, or trust issues.' },
+		{ name: 'collision', color: 'd4c5f9', description: 'Collision/physics mismatch with visuals or unstable edges.' },
+		{ name: 'difficulty', color: 'c2e0c6', description: 'Difficulty tuning/normalization issues.' },
+		{ name: 'debug', color: 'bfdadc', description: 'Debug overlays, diagnostics, or instrumentation.' },
 		{ name: 'device: desktop', color: deviceColor, description: 'Reported from desktop/laptop browser.' },
 		{ name: 'device: tablet', color: deviceColor, description: 'Reported from tablet browser.' },
 		{ name: 'device: mobile', color: deviceColor, description: 'Reported from mobile browser.' },
@@ -315,7 +340,144 @@ function makeDefaultTitle(message) {
 	return `Feedback: ${short}`;
 }
 
-function makeIssueBody({ ts, deviceType, message, markerId, sourceFile, sourceLine }) {
+function deriveLabelsFromMessage(message) {
+	const m = String(message || '').toLowerCase();
+	const labels = new Set();
+
+	// Broad buckets aligned to .github/ISSUE_TEMPLATE/02-ai-fix-request.md
+	labels.add('gameplay');
+	labels.add('ai-fix');
+
+	if (/platform|line\b|lines\b|detect|detection|photo|image|generation|geometry|merge|snap/.test(m)) {
+		labels.add('generation');
+	}
+	if (/colli|hitbox|clip|stuck|fall\s?through|ghost|wall\b|floor\b/.test(m)) {
+		labels.add('collision');
+	}
+	if (/unfair|impossible|unwinnable|can\'?t\s+jump|not\s+jumpable|precision\s+jump|trust/.test(m)) {
+		labels.add('fairness');
+	}
+	if (/hard|too\s+hard|difficulty|spike|frustrat|punish/.test(m)) {
+		labels.add('difficulty');
+	}
+	if (/debug|overlay|visualize|log\b|instrument/.test(m)) {
+		labels.add('debug');
+	}
+
+	return Array.from(labels);
+}
+
+function makeIssueBodyTemplate({ ts, deviceType, message, markerId, sourceFile, sourceLine, record }) {
+	const safeMessage = redactIps(message);
+	const safeRecord = sanitizeFeedbackRecordForIssue(record);
+	const recordLines = Object.keys(safeRecord).length
+		? ['```json', JSON.stringify(safeRecord, null, 2), '```']
+		: ['(no additional safe fields found)'];
+
+	return [
+		'# 🤖 AI Fix – Photo Jumper',
+		'',
+		'This issue was created from the in-game local feedback log.',
+		'Treat this as a **design brief**, not just a bug report.',
+		'',
+		'---',
+		'',
+		'## 🧩 Problem Statement',
+		'',
+		safeMessage || '(empty)',
+		'',
+		'---',
+		'',
+		'## 🎯 Desired Outcome',
+		'',
+		'- (fill in) What should the player experience change to?',
+		'',
+		'---',
+		'',
+		'## 🧠 Constraints (Non-Negotiable)',
+		'',
+		'- Gameplay quality overrides image accuracy',
+		'- Jump physics must remain unchanged unless explicitly stated',
+		'- Platforms must be fair, predictable, and solid',
+		'- Visuals must match collision geometry exactly',
+		'- The game must remain web-based and performant',
+		'',
+		'---',
+		'',
+		'## 📐 Gameplay Rules to Respect',
+		'',
+		'Confirm applicable limits (edit if they differ in code):',
+		'',
+		'- Max horizontal jump: **120px**',
+		'- Max vertical jump height: **90px**',
+		'- Player hitbox: **16px × 24px**',
+		'- Landing tolerance: **4px** vertical snap',
+		'',
+		'Platform generation constraints:',
+		'',
+		'- Min platform width: **40px**',
+		'- Min platform thickness: **12px**',
+		'- Snap near-horizontal tolerance: **8°**',
+		'- Merge collinear tolerance: **6px**',
+		'',
+		'If detected geometry violates these rules, it **must be adjusted or discarded**.',
+		'',
+		'---',
+		'',
+		'## 📷 Photo → Platform Context (if applicable)',
+		'',
+		'- [ ] Issue caused by shadows / lighting',
+		'- [ ] Issue caused by perspective distortion',
+		'- [ ] Issue caused by noisy / short line detection',
+		'- [ ] Issue caused by platform thickness',
+		'- [ ] Issue caused by platform spacing',
+		'- [ ] Other (describe below)',
+		'',
+		'Additional notes about the photo input:',
+		'',
+		'---',
+		'',
+		'## 🛠 Technical Expectations',
+		'',
+		'- Prefer normalization and filtering over new features',
+		'- Avoid adding new libraries unless clearly justified',
+		'- Expose tunable values instead of hardcoding numbers',
+		'- Add optional debug overlays if it improves clarity',
+		'- Keep logic readable and learner-friendly',
+		'',
+		'---',
+		'',
+		'## 🧪 Acceptance Criteria',
+		'',
+		'- [ ] The level remains winnable',
+		'- [ ] Platforms feel solid and predictable',
+		'- [ ] Player deaths are explainable and fair',
+		'- [ ] No accidental precision jumps introduced',
+		'- [ ] Visuals and collisions are aligned',
+		'- [ ] Performance is not degraded',
+		'',
+		'---',
+		'',
+		'## 📎 References',
+		'',
+		`- Feedback received: ${ts}`,
+		`- Device: ${String(deviceType || 'unknown')}`,
+		`- Source: ${path.basename(sourceFile)}#L${sourceLine}`,
+		'',
+		'### Safe extracted context',
+		...recordLines,
+		'',
+		'---',
+		'',
+		'## 🧭 Guiding Principle',
+		'',
+		'> **If image accuracy and gameplay quality conflict, gameplay quality wins.**',
+		'',
+		makeMarkerLine(markerId)
+	].join('\n');
+}
+
+function makeIssueBodyLegacy({ ts, deviceType, message, markerId, sourceFile, sourceLine }) {
 	const safeMessage = redactIps(message);
 	return [
 		`Feedback received: ${ts}`,
@@ -436,7 +598,8 @@ async function main() {
 					sourceFile: feedbackFile,
 					ts: String(r.ts || ''),
 					deviceType: String(r.deviceType || 'unknown').toLowerCase(),
-					message: typeof r.message === 'string' ? r.message : ''
+					message: typeof r.message === 'string' ? r.message : '',
+					record: r
 				};
 			});
 
@@ -555,16 +718,29 @@ async function main() {
 				const defaultTitle = makeDefaultTitle(item.message);
 				const titleInput = await promptLine(rl, `Title (default: ${defaultTitle}): `);
 				const title = titleInput ? titleInput : defaultTitle;
-				const body = makeIssueBody({
+				const body = args.useTemplateBody
+					? makeIssueBodyTemplate({
+							ts: item.ts,
+							deviceType: item.deviceType,
+							message: item.message,
+							markerId,
+							sourceFile: item.sourceFile,
+							sourceLine: item.lineNo,
+							record: item.record
+						})
+					: makeIssueBodyLegacy({
 					ts: item.ts,
 					deviceType: item.deviceType,
 					message: item.message,
 					markerId,
 					sourceFile: item.sourceFile,
 					sourceLine: item.lineNo
-				});
+					});
 
-				const labels = ['feedback', 'needs-triage', ...labelsForDevice(item.deviceType)];
+				const derived = deriveLabelsFromMessage(item.message);
+				const labels = Array.from(
+					new Set(['feedback', 'needs-triage', ...labelsForDevice(item.deviceType), ...derived])
+				);
 
 				if (args.dryRun) {
 					process.stdout.write('(dry-run) Would create issue with:\n');
