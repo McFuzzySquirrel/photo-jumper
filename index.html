@@ -258,6 +258,44 @@
             color: #0b6b0b;
         }
 
+        /* Mobile control buttons */
+        .mobile-controls {
+            display: none;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+            user-select: none;
+        }
+
+        .mobile-controls.visible {
+            display: flex;
+        }
+
+        .control-btn {
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: 3px solid white;
+            border-radius: 15px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            touch-action: none;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .control-btn.jump-btn {
+            width: 90px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
         @media (max-width: 600px) {
             h1 {
                 font-size: 1.8em;
@@ -308,6 +346,13 @@
         <div class="game-canvas-container">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <canvas id="previewCanvas" class="preview-canvas"></canvas>
+        </div>
+
+        <!-- Mobile control buttons -->
+        <div class="mobile-controls" id="mobileControls">
+            <button class="control-btn" id="leftBtn" aria-label="Move left">◀</button>
+            <button class="control-btn jump-btn" id="jumpBtn" aria-label="Jump">▲</button>
+            <button class="control-btn" id="rightBtn" aria-label="Move right">▶</button>
         </div>
 
         <div class="instructions">
@@ -383,6 +428,12 @@
 
         const debugOverlayToggle = document.getElementById('debugOverlayToggle');
 
+        // Mobile control buttons
+        const mobileControls = document.getElementById('mobileControls');
+        const leftBtn = document.getElementById('leftBtn');
+        const rightBtn = document.getElementById('rightBtn');
+        const jumpBtn = document.getElementById('jumpBtn');
+
         const FEEDBACK_TOKEN_STORAGE_KEY = 'photoJumperFeedbackToken';
 
         // Game configuration constants
@@ -391,11 +442,11 @@
         const PLAYER_JUMP_POWER = 12;
         const PLAYER_GRAVITY = 0.5;
 
-        const GRID_SIZE = 30;  // 1.5x player size (20px) for minimum jumping gaps
-        const BRIGHTNESS_THRESHOLD = 128;
+        const GRID_SIZE = 20;  // Reduced from 30 to detect more platforms (1x player size)
+        const BRIGHTNESS_THRESHOLD = 140;  // Increased from 128 to require brighter areas for platforms
         const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-        const EDGE_DETECTION_THRESHOLD = 40;  // Brightness difference for edge detection
-        const EDGE_BRIGHTNESS_THRESHOLD = 180;  // Max brightness for edge-detected platforms
+        const EDGE_DETECTION_THRESHOLD = 30;  // Reduced from 40 for better edge detection
+        const EDGE_BRIGHTNESS_THRESHOLD = 200;  // Increased from 180 to accept more edge-detected platforms
 
         // Gameplay-first platform constraints
         const PLATFORM_MIN_WIDTH = 40;
@@ -462,7 +513,7 @@
                 } else if (keys['ArrowRight'] || keys['d'] || keys['D']) {
                     this.velocityX = this.speed;
                 } else {
-                    this.velocityX *= 0.8; // Friction
+                    this.velocityX *= 0.7; // Reduced friction for more responsive feel
                 }
 
                 // Jumping
@@ -1493,6 +1544,54 @@
             touchJumping = false;
             keys['ArrowLeft'] = false;
             keys['ArrowRight'] = false;
+        });
+
+        // Mobile control button handlers
+        // Detect if device supports touch and show controls
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            mobileControls.classList.add('visible');
+        }
+
+        // Left button
+        leftBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            keys['ArrowLeft'] = true;
+        });
+        leftBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            keys['ArrowLeft'] = false;
+        });
+        leftBtn.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            keys['ArrowLeft'] = false;
+        });
+
+        // Right button
+        rightBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            keys['ArrowRight'] = true;
+        });
+        rightBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            keys['ArrowRight'] = false;
+        });
+        rightBtn.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            keys['ArrowRight'] = false;
+        });
+
+        // Jump button
+        jumpBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchJumping = true;
+        });
+        jumpBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchJumping = false;
+        });
+        jumpBtn.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            touchJumping = false;
         });
 
         document.addEventListener('keydown', (e) => {
