@@ -44,6 +44,8 @@ A web-based platform jumping game that converts your photos into playable levels
   - Touch: Touch controls for mobile devices
 - 📊 **Score Tracking**: Track your score and time as you play
 - 📱 **Responsive Design**: Works on desktop and mobile devices
+- 📲 **Installable PWA**: Install as a standalone app on desktop or mobile
+- 🔌 **Offline Support**: Play without internet after first visit
 
 ## How to Play
 
@@ -56,6 +58,22 @@ A web-based platform jumping game that converts your photos into playable levels
    - **Mobile**: Touch controls
 5. Try to navigate through the level without falling!
 6. Click "New Photo" to load a different image
+
+## Install as App (PWA)
+
+Photo Jumper is a Progressive Web App (PWA) that can be installed on your device:
+
+**Desktop (Chrome/Edge):**
+1. Visit the game URL
+2. Click the install icon (⊕) in the address bar
+3. Click "Install"
+
+**Mobile (Android/iOS):**
+1. Visit the game URL in your browser
+2. Tap "Add to Home Screen" (from browser menu or prompt)
+3. The app will appear on your home screen
+
+Once installed, Photo Jumper works offline and launches like a native app!
 
 ## Quick Start
 
