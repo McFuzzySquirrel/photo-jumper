@@ -38,8 +38,11 @@ We will implement ONNX-based object detection as an **optional, experimental fea
 1. **ONNX Runtime Loading**
    - Loaded from `cdn.jsdelivr.net/npm/onnxruntime-web`
    - Backends: WebGL → WASM fallback
-   - Model: YOLOv8n from Hugging Face (or self-hosted option)
-   - Model can be exported from Ultralytics using their export feature
+   - Model loading with fallback chain:
+     1. Local `models/yolov8n.onnx` (preferred for reliability)
+     2. CDN fallback URLs
+   - **Self-hosting recommended**: Place `yolov8n.onnx` in a `models/` folder next to `index.html`
+   - Model can be downloaded from [Ultralytics releases](https://github.com/ultralytics/assets/releases)
 
 2. **Object-to-Platform Mapping**
    - **Bottom edge heuristic**: Use the bottom edge of detected objects as platform surfaces

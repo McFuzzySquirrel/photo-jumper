@@ -672,10 +672,13 @@
 
         // ONNX ML detection configuration
         const ML_DETECTION_ENABLED_DEFAULT = false;
-        // Note: YOLOv8n model should be hosted on a reliable CDN or self-hosted
-        // The model can be obtained from Ultralytics and exported to ONNX format
-        // See: https://docs.ultralytics.com/modes/export/ for export instructions
-        const ML_MODEL_URL = 'https://huggingface.co/nickmuchi/yolov8n-onnx/resolve/main/yolov8n.onnx';
+        // Model URLs: Try local first, then CDN fallbacks
+        // To self-host: place yolov8n.onnx in a 'models/' folder alongside index.html
+        // Model can be exported from Ultralytics: https://docs.ultralytics.com/modes/export/
+        const ML_MODEL_URLS = [
+            'models/yolov8n.onnx',  // Local model (preferred for reliability)
+            'https://cdn.jsdelivr.net/gh/aspect-technology/yolov8-onnx@main/models/yolov8n.onnx',  // CDN fallback
+        ];
         const ML_CONFIDENCE_THRESHOLD = 0.5;
         const ML_INPUT_SIZE = 640;  // YOLOv8n expects 640x640 input images
         const ML_INFERENCE_TIMEOUT_MS = 5000;
@@ -991,7 +994,7 @@
             });
         }
 
-        // Initialize ONNX model (lazy load)
+        // Initialize ONNX model (lazy load with fallback URLs)
         async function initONNXModel() {
             if (onnxSession) return true;
             if (onnxModelLoading) return false;
@@ -1004,23 +1007,40 @@
                 // Load ONNX runtime first
                 await loadONNXRuntime();
                 
-                // Create inference session with fallback backends
-                onnxSession = await ort.InferenceSession.create(ML_MODEL_URL, {
-                    executionProviders: ['webgl', 'wasm'],
-                    graphOptimizationLevel: 'all'
-                });
+                // Try each model URL until one works
+                let lastError = null;
+                for (const modelUrl of ML_MODEL_URLS) {
+                    try {
+                        updateMLStatus(`Trying ${modelUrl.includes('://') ? 'CDN' : 'local'} model...`);
+                        console.log('Attempting to load model from:', modelUrl);
+                        
+                        onnxSession = await ort.InferenceSession.create(modelUrl, {
+                            executionProviders: ['webgl', 'wasm'],
+                            graphOptimizationLevel: 'all'
+                        });
+                        
+                        onnxModelLoaded = true;
+                        onnxModelLoading = false;
+                        updateMLStatus('ML ready');
+                        console.log('ONNX model loaded successfully from:', modelUrl);
+                        return true;
+                    } catch (urlError) {
+                        console.warn(`Failed to load model from ${modelUrl}:`, urlError.message);
+                        lastError = urlError;
+                        // Continue to try next URL
+                    }
+                }
                 
-                onnxModelLoaded = true;
-                onnxModelLoading = false;
-                updateMLStatus('ML ready');
-                console.log('ONNX model loaded successfully');
-                return true;
+                // All URLs failed
+                throw lastError || new Error('All model URLs failed');
             } catch (err) {
                 onnxLoadError = err;
                 onnxModelLoading = false;
                 onnxModelLoaded = false;
-                updateMLStatus('ML failed to load');
-                console.warn('Failed to load ONNX model:', err);
+                updateMLStatus('ML failed - see console');
+                console.error('Failed to load ONNX model from all sources:', err);
+                console.info('To fix: place yolov8n.onnx in a "models/" folder next to index.html');
+                console.info('Download from: https://github.com/ultralytics/assets/releases');
                 return false;
             }
         }
@@ -2052,12 +2072,16 @@
                 mlDetectionEnabled = Boolean(mlDetectionToggle.checked);
                 
                 if (mlDetectionEnabled && !onnxModelLoaded && !onnxModelLoading) {
+                    // Reset error state to allow retry
+                    onnxLoadError = null;
+                    
                     // Start loading the ONNX model when user enables ML detection
                     const success = await initONNXModel();
                     if (!success) {
-                        // If loading fails, disable the toggle
+                        // If loading fails, disable the toggle and show helpful message
                         mlDetectionToggle.checked = false;
                         mlDetectionEnabled = false;
+                        alert('ML model failed to load. To use ML detection:\n\n1. Download yolov8n.onnx from:\n   https://github.com/ultralytics/assets/releases\n\n2. Place it in a "models/" folder next to index.html\n\n3. Try again');
                     }
                 } else if (mlDetectionEnabled && onnxModelLoaded) {
                     updateMLStatus('ML ready');
