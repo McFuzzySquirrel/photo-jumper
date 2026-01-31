@@ -31,14 +31,18 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('[SW] Caching core assets');
-        // Cache what we can, don't fail on missing icons
+        // Cache what we can, track failures but don't block installation
         return Promise.allSettled(
-          PRECACHE_ASSETS.map(url => 
-            cache.add(url).catch(err => {
-              console.warn(`[SW] Failed to cache ${url}:`, err.message);
-            })
-          )
-        );
+          PRECACHE_ASSETS.map(url => cache.add(url))
+        ).then(results => {
+          const failures = results.filter(r => r.status === 'rejected');
+          if (failures.length > 0) {
+            console.warn(`[SW] Failed to cache ${failures.length} asset(s):`);
+            failures.forEach((f, i) => console.warn(`  - ${PRECACHE_ASSETS[results.indexOf(f)]}: ${f.reason?.message || 'Unknown error'}`));
+          }
+          const successes = results.filter(r => r.status === 'fulfilled').length;
+          console.log(`[SW] Cached ${successes}/${PRECACHE_ASSETS.length} assets`);
+        });
       })
       .then(() => {
         console.log('[SW] Core assets cached');
@@ -173,9 +177,18 @@ self.addEventListener('message', (event) => {
   // Handle cache ML assets request
   if (event.data === 'cacheMLAssets') {
     cacheMLAssets().then(() => {
-      event.ports[0]?.postMessage({ success: true });
+      // Try MessageChannel first, fall back to client messaging
+      if (event.ports && event.ports[0]) {
+        event.ports[0].postMessage({ success: true });
+      } else if (event.source) {
+        event.source.postMessage({ type: 'cacheMLAssetsResult', success: true });
+      }
     }).catch((error) => {
-      event.ports[0]?.postMessage({ success: false, error: error.message });
+      if (event.ports && event.ports[0]) {
+        event.ports[0].postMessage({ success: false, error: error.message });
+      } else if (event.source) {
+        event.source.postMessage({ type: 'cacheMLAssetsResult', success: false, error: error.message });
+      }
     });
   }
 });

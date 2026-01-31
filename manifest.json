@@ -59,15 +59,6 @@
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "docs/adr/screenshots/after-journey-02.png",
-      "sizes": "800x600",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Photo Jumper gameplay"
-    }
-  ],
   "related_applications": [],
   "prefer_related_applications": false
 }
