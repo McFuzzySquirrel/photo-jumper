@@ -672,7 +672,10 @@
 
         // ONNX ML detection configuration
         const ML_DETECTION_ENABLED_DEFAULT = false;
-        const ML_MODEL_URL = 'https://cdn.jsdelivr.net/gh/niconielsen32/yolov8n-onnx-web@v1.0.0/yolov8n.onnx';
+        // Note: YOLOv8n model should be hosted on a reliable CDN or self-hosted
+        // The model can be obtained from Ultralytics and exported to ONNX format
+        // See: https://docs.ultralytics.com/modes/export/ for export instructions
+        const ML_MODEL_URL = 'https://huggingface.co/nickmuchi/yolov8n-onnx/resolve/main/yolov8n.onnx';
         const ML_CONFIDENCE_THRESHOLD = 0.5;
         const ML_INPUT_SIZE = 640;  // YOLOv8n expects 640x640 input images
         const ML_INFERENCE_TIMEOUT_MS = 5000;
