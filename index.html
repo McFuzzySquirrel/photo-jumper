@@ -534,8 +534,9 @@
             <p>5. Navigate from the green start platform to the golden goal star!</p>
             <p>6. Press <strong>R</strong> to respawn if you get stuck</p>
             <p><label><input type="checkbox" id="debugOverlayToggle"> Debug overlay</label></p>
-            <p><label><input type="checkbox" id="mlDetectionToggle"> ML object detection (experimental)</label>
+            <p><label><input type="checkbox" id="mlDetectionToggle" aria-describedby="mlStatusDesc"> ML object detection (experimental)</label>
                 <span id="mlStatus" style="font-size: 12px; color: #666;"></span>
+                <span id="mlStatusDesc" class="visually-hidden" style="position: absolute; left: -10000px;">When enabled, uses machine learning to detect objects in your photo and create platforms from them. May increase loading time.</span>
             </p>
         </div>
         </div>
@@ -673,8 +674,11 @@
         const ML_DETECTION_ENABLED_DEFAULT = false;
         const ML_MODEL_URL = 'https://cdn.jsdelivr.net/gh/niconielsen32/yolov8n-onnx-web@v1.0.0/yolov8n.onnx';
         const ML_CONFIDENCE_THRESHOLD = 0.5;
-        const ML_INPUT_SIZE = 640;
+        const ML_INPUT_SIZE = 640;  // YOLOv8n expects 640x640 input images
         const ML_INFERENCE_TIMEOUT_MS = 5000;
+        const ML_MIN_DETECTION_SIZE = 10;  // Minimum bounding box size in pixels to consider
+        const ML_PLATFORM_MERGE_TOLERANCE = 20;  // Extra horizontal gap tolerance when merging ML platforms
+        const ML_PLATFORM_OVERLAP_TOLERANCE_Y = 10;  // Vertical overlap tolerance when combining ML and grid platforms
         
         // COCO classes that are suitable for platforms (horizontal surfaces)
         const PLATFORMABLE_CLASSES = [
@@ -1081,22 +1085,31 @@
                 // Preprocess image
                 const { tensor, scale, offsetX, offsetY } = preprocessImageForYOLO(null, width, height);
                 
-                // Run inference with timeout
-                const results = await Promise.race([
-                    onnxSession.run({ images: tensor }),
-                    new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('Inference timeout')), ML_INFERENCE_TIMEOUT_MS)
-                    )
-                ]);
+                // Run inference with timeout (clean up timeout when inference completes)
+                let timeoutId;
+                const timeoutPromise = new Promise((_, reject) => {
+                    timeoutId = setTimeout(() => reject(new Error('Inference timeout')), ML_INFERENCE_TIMEOUT_MS);
+                });
                 
-                const inferenceTime = performance.now() - startTime;
-                console.log(`ONNX inference completed in ${inferenceTime.toFixed(0)}ms`);
-                
-                // Process YOLO output
-                const output = results.output0;
-                const detections = processYOLOOutput(output, width, height, scale, offsetX, offsetY);
-                
-                return detections;
+                try {
+                    const results = await Promise.race([
+                        onnxSession.run({ images: tensor }),
+                        timeoutPromise
+                    ]);
+                    clearTimeout(timeoutId);
+                    
+                    const inferenceTime = performance.now() - startTime;
+                    console.log(`ONNX inference completed in ${inferenceTime.toFixed(0)}ms`);
+                    
+                    // Process YOLO output
+                    const output = results.output0;
+                    const detections = processYOLOOutput(output, width, height, scale, offsetX, offsetY);
+                    
+                    return detections;
+                } catch (inferErr) {
+                    clearTimeout(timeoutId);
+                    throw inferErr;
+                }
             } catch (err) {
                 console.warn('ONNX inference failed:', err);
                 return [];
@@ -1144,7 +1157,7 @@
                 const clampedW = Math.min(boxW, originalWidth - clampedX);
                 const clampedH = Math.min(boxH, originalHeight - clampedY);
                 
-                if (clampedW < 10 || clampedH < 10) continue; // Skip tiny detections
+                if (clampedW < ML_MIN_DETECTION_SIZE || clampedH < ML_MIN_DETECTION_SIZE) continue;
                 
                 const className = COCO_CLASSES[maxClass] || 'unknown';
                 
@@ -1274,7 +1287,7 @@
                 
                 // Merge if on same Y level (within tolerance) and horizontally adjacent/overlapping
                 const sameRow = Math.abs(next.y - current.y) < PLATFORM_THICKNESS;
-                const adjacent = next.x <= current.x + current.width + PLATFORM_MERGE_GAP_PX + 20;
+                const adjacent = next.x <= current.x + current.width + PLATFORM_MERGE_GAP_PX + ML_PLATFORM_MERGE_TOLERANCE;
                 
                 if (sameRow && adjacent) {
                     // Extend current platform
@@ -1678,8 +1691,8 @@
                     for (const mlPlatform of mlPlatforms) {
                         const overlap = !(gridPlatform.x + gridPlatform.width < mlPlatform.x ||
                             gridPlatform.x > mlPlatform.x + mlPlatform.width ||
-                            gridPlatform.y + gridPlatform.height < mlPlatform.y - 10 ||
-                            gridPlatform.y > mlPlatform.y + mlPlatform.height + 10);
+                            gridPlatform.y + gridPlatform.height < mlPlatform.y - ML_PLATFORM_OVERLAP_TOLERANCE_Y ||
+                            gridPlatform.y > mlPlatform.y + mlPlatform.height + ML_PLATFORM_OVERLAP_TOLERANCE_Y);
                         if (overlap) {
                             overlapsML = true;
                             break;
