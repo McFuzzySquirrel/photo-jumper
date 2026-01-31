@@ -23,3 +23,8 @@ You can generate a new note from the template via:
 - `npm run learning:note`
 
 This will prompt you for each section and create a new file in `learning/journey/notes/`.
+
+## Research
+
+Longer-form research and exploration documents live in `research/`:
+- [Object Detection Research](research/object-detection.md) - Exploring ONNX and alternatives for better platform detection
