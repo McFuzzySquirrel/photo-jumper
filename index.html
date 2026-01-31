@@ -534,6 +534,9 @@
             <p>5. Navigate from the green start platform to the golden goal star!</p>
             <p>6. Press <strong>R</strong> to respawn if you get stuck</p>
             <p><label><input type="checkbox" id="debugOverlayToggle"> Debug overlay</label></p>
+            <p><label><input type="checkbox" id="mlDetectionToggle"> ML object detection (experimental)</label>
+                <span id="mlStatus" style="font-size: 12px; color: #666;"></span>
+            </p>
         </div>
         </div>
         <!-- End Game Screen -->
@@ -665,6 +668,43 @@
         let debugSolidGrid = null;
         let debugGridSize = GRID_SIZE;
         let debugHelperPlatforms = [];
+
+        // ONNX ML detection configuration
+        const ML_DETECTION_ENABLED_DEFAULT = false;
+        const ML_MODEL_URL = 'https://cdn.jsdelivr.net/gh/niconielsen32/yolov8n-onnx-web@v1.0.0/yolov8n.onnx';
+        const ML_CONFIDENCE_THRESHOLD = 0.5;
+        const ML_INPUT_SIZE = 640;
+        const ML_INFERENCE_TIMEOUT_MS = 5000;
+        
+        // COCO classes that are suitable for platforms (horizontal surfaces)
+        const PLATFORMABLE_CLASSES = [
+            'bench', 'chair', 'couch', 'bed', 'dining table', 'desk',
+            'toilet', 'tv', 'laptop', 'keyboard', 'book', 'suitcase',
+            'refrigerator', 'oven', 'microwave', 'sink', 'car', 'bus',
+            'truck', 'boat', 'train', 'airplane'
+        ];
+        
+        // COCO class names (80 classes)
+        const COCO_CLASSES = [
+            'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
+            'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat',
+            'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack',
+            'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
+            'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+            'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
+            'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake',
+            'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
+            'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
+            'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
+        ];
+
+        // ONNX state
+        let mlDetectionEnabled = ML_DETECTION_ENABLED_DEFAULT;
+        let onnxSession = null;
+        let onnxModelLoading = false;
+        let onnxModelLoaded = false;
+        let onnxLoadError = null;
+        let debugDetectedObjects = [];
 
         // Player class
         class Player {
@@ -927,8 +967,335 @@
             }
         }
 
+        // ==========================================
+        // ONNX ML Detection Functions
+        // ==========================================
+
+        // Lazy-load ONNX Runtime from CDN
+        async function loadONNXRuntime() {
+            if (typeof ort !== 'undefined') return true;
+            
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js';
+                script.onload = () => resolve(true);
+                script.onerror = () => reject(new Error('Failed to load ONNX Runtime'));
+                document.head.appendChild(script);
+            });
+        }
+
+        // Initialize ONNX model (lazy load)
+        async function initONNXModel() {
+            if (onnxSession) return true;
+            if (onnxModelLoading) return false;
+            if (onnxLoadError) return false;
+            
+            onnxModelLoading = true;
+            updateMLStatus('Loading ML model...');
+            
+            try {
+                // Load ONNX runtime first
+                await loadONNXRuntime();
+                
+                // Create inference session with fallback backends
+                onnxSession = await ort.InferenceSession.create(ML_MODEL_URL, {
+                    executionProviders: ['webgl', 'wasm'],
+                    graphOptimizationLevel: 'all'
+                });
+                
+                onnxModelLoaded = true;
+                onnxModelLoading = false;
+                updateMLStatus('ML ready');
+                console.log('ONNX model loaded successfully');
+                return true;
+            } catch (err) {
+                onnxLoadError = err;
+                onnxModelLoading = false;
+                onnxModelLoaded = false;
+                updateMLStatus('ML failed to load');
+                console.warn('Failed to load ONNX model:', err);
+                return false;
+            }
+        }
+
+        // Update ML status indicator
+        function updateMLStatus(text) {
+            const mlStatusEl = document.getElementById('mlStatus');
+            if (mlStatusEl) {
+                mlStatusEl.textContent = text ? ` (${text})` : '';
+            }
+        }
+
+        // Preprocess image for YOLO model input
+        function preprocessImageForYOLO(imageData, width, height) {
+            // Create a temporary canvas to resize image to ML_INPUT_SIZE x ML_INPUT_SIZE
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = ML_INPUT_SIZE;
+            tempCanvas.height = ML_INPUT_SIZE;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Draw with letterboxing to maintain aspect ratio
+            const scale = Math.min(ML_INPUT_SIZE / width, ML_INPUT_SIZE / height);
+            const scaledWidth = Math.floor(width * scale);
+            const scaledHeight = Math.floor(height * scale);
+            const offsetX = Math.floor((ML_INPUT_SIZE - scaledWidth) / 2);
+            const offsetY = Math.floor((ML_INPUT_SIZE - scaledHeight) / 2);
+            
+            // Fill with gray (letterbox padding)
+            tempCtx.fillStyle = '#808080';
+            tempCtx.fillRect(0, 0, ML_INPUT_SIZE, ML_INPUT_SIZE);
+            
+            // Draw the resized image centered
+            tempCtx.drawImage(previewCanvas, 0, 0, width, height, offsetX, offsetY, scaledWidth, scaledHeight);
+            
+            // Get pixel data
+            const resizedData = tempCtx.getImageData(0, 0, ML_INPUT_SIZE, ML_INPUT_SIZE).data;
+            
+            // Convert to normalized float32 tensor [1, 3, 640, 640] (NCHW format)
+            const inputSize = ML_INPUT_SIZE * ML_INPUT_SIZE;
+            const float32Data = new Float32Array(3 * inputSize);
+            
+            for (let i = 0; i < inputSize; i++) {
+                const pixelIndex = i * 4;
+                // Normalize to [0, 1]
+                float32Data[i] = resizedData[pixelIndex] / 255.0;                    // R channel
+                float32Data[i + inputSize] = resizedData[pixelIndex + 1] / 255.0;   // G channel
+                float32Data[i + 2 * inputSize] = resizedData[pixelIndex + 2] / 255.0; // B channel
+            }
+            
+            return {
+                tensor: new ort.Tensor('float32', float32Data, [1, 3, ML_INPUT_SIZE, ML_INPUT_SIZE]),
+                scale,
+                offsetX,
+                offsetY
+            };
+        }
+
+        // Run YOLO inference and extract bounding boxes
+        async function detectObjectsWithONNX(width, height) {
+            if (!onnxSession) return [];
+            
+            try {
+                const startTime = performance.now();
+                
+                // Preprocess image
+                const { tensor, scale, offsetX, offsetY } = preprocessImageForYOLO(null, width, height);
+                
+                // Run inference with timeout
+                const results = await Promise.race([
+                    onnxSession.run({ images: tensor }),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Inference timeout')), ML_INFERENCE_TIMEOUT_MS)
+                    )
+                ]);
+                
+                const inferenceTime = performance.now() - startTime;
+                console.log(`ONNX inference completed in ${inferenceTime.toFixed(0)}ms`);
+                
+                // Process YOLO output
+                const output = results.output0;
+                const detections = processYOLOOutput(output, width, height, scale, offsetX, offsetY);
+                
+                return detections;
+            } catch (err) {
+                console.warn('ONNX inference failed:', err);
+                return [];
+            }
+        }
+
+        // Process YOLO v8 output format [1, 84, 8400] -> bounding boxes
+        function processYOLOOutput(output, originalWidth, originalHeight, scale, offsetX, offsetY) {
+            const data = output.data;
+            const [batch, features, numBoxes] = output.dims; // [1, 84, 8400]
+            
+            const detections = [];
+            
+            // YOLOv8 output format: first 4 values are [cx, cy, w, h], remaining 80 are class probabilities
+            for (let i = 0; i < numBoxes; i++) {
+                // Extract box coordinates (cx, cy, w, h)
+                const cx = data[i];
+                const cy = data[numBoxes + i];
+                const w = data[2 * numBoxes + i];
+                const h = data[3 * numBoxes + i];
+                
+                // Find the class with highest probability
+                let maxProb = 0;
+                let maxClass = 0;
+                for (let c = 0; c < 80; c++) {
+                    const prob = data[(4 + c) * numBoxes + i];
+                    if (prob > maxProb) {
+                        maxProb = prob;
+                        maxClass = c;
+                    }
+                }
+                
+                // Filter by confidence threshold
+                if (maxProb < ML_CONFIDENCE_THRESHOLD) continue;
+                
+                // Convert from letterboxed coordinates to original image coordinates
+                const x1 = (cx - w / 2 - offsetX) / scale;
+                const y1 = (cy - h / 2 - offsetY) / scale;
+                const boxW = w / scale;
+                const boxH = h / scale;
+                
+                // Clamp to image bounds
+                const clampedX = Math.max(0, Math.min(x1, originalWidth - 1));
+                const clampedY = Math.max(0, Math.min(y1, originalHeight - 1));
+                const clampedW = Math.min(boxW, originalWidth - clampedX);
+                const clampedH = Math.min(boxH, originalHeight - clampedY);
+                
+                if (clampedW < 10 || clampedH < 10) continue; // Skip tiny detections
+                
+                const className = COCO_CLASSES[maxClass] || 'unknown';
+                
+                detections.push({
+                    class: className,
+                    classId: maxClass,
+                    confidence: maxProb,
+                    bbox: [clampedX, clampedY, clampedW, clampedH],
+                    isPlatformable: PLATFORMABLE_CLASSES.includes(className)
+                });
+            }
+            
+            // Apply Non-Maximum Suppression (NMS)
+            return applyNMS(detections, 0.45);
+        }
+
+        // Non-Maximum Suppression to remove overlapping detections
+        function applyNMS(detections, iouThreshold) {
+            // Sort by confidence (descending)
+            detections.sort((a, b) => b.confidence - a.confidence);
+            
+            const kept = [];
+            const suppressed = new Set();
+            
+            for (let i = 0; i < detections.length; i++) {
+                if (suppressed.has(i)) continue;
+                
+                kept.push(detections[i]);
+                
+                for (let j = i + 1; j < detections.length; j++) {
+                    if (suppressed.has(j)) continue;
+                    
+                    const iou = calculateIoU(detections[i].bbox, detections[j].bbox);
+                    if (iou > iouThreshold) {
+                        suppressed.add(j);
+                    }
+                }
+            }
+            
+            return kept;
+        }
+
+        // Calculate Intersection over Union (IoU) between two bounding boxes
+        function calculateIoU(box1, box2) {
+            const [x1, y1, w1, h1] = box1;
+            const [x2, y2, w2, h2] = box2;
+            
+            const interX1 = Math.max(x1, x2);
+            const interY1 = Math.max(y1, y2);
+            const interX2 = Math.min(x1 + w1, x2 + w2);
+            const interY2 = Math.min(y1 + h1, y2 + h2);
+            
+            const interW = Math.max(0, interX2 - interX1);
+            const interH = Math.max(0, interY2 - interY1);
+            const interArea = interW * interH;
+            
+            const area1 = w1 * h1;
+            const area2 = w2 * h2;
+            const unionArea = area1 + area2 - interArea;
+            
+            return unionArea > 0 ? interArea / unionArea : 0;
+        }
+
+        // Map detected objects to platform candidates using bottom-edge heuristic
+        function mapObjectsToPlatforms(detections, canvasWidth, canvasHeight) {
+            const platformCandidates = [];
+            
+            for (const detection of detections) {
+                const [x, y, w, h] = detection.bbox;
+                
+                // Use bottom edge of detected object as platform surface
+                // For platformable objects, the bottom edge represents where you could stand
+                const platformY = y + h - PLATFORM_THICKNESS;
+                const platformX = x;
+                const platformWidth = w;
+                
+                // Skip if platform would be in reserved areas
+                const isStartArea = (platformX < START_AREA_WIDTH && platformY > canvasHeight - START_AREA_HEIGHT);
+                const isGoalArea = (platformX > canvasWidth - GOAL_AREA_WIDTH && platformY < GOAL_AREA_HEIGHT);
+                if (isStartArea || isGoalArea) continue;
+                
+                // Skip if platform is too small
+                if (platformWidth < PLATFORM_MIN_WIDTH) continue;
+                
+                // Skip if platform is outside canvas bounds
+                if (platformY < 0 || platformY > canvasHeight - PLATFORM_THICKNESS) continue;
+                
+                // Assign color based on detection confidence and whether it's a "platformable" object
+                let color;
+                if (detection.isPlatformable) {
+                    // Green-tinted for explicitly platformable objects
+                    const alpha = 0.75 + (detection.confidence * 0.2);
+                    color = `rgba(60, 150, 80, ${alpha})`;
+                } else {
+                    // Blue-tinted for other detected objects
+                    const alpha = 0.65 + (detection.confidence * 0.2);
+                    color = `rgba(80, 100, 160, ${alpha})`;
+                }
+                
+                platformCandidates.push({
+                    x: platformX,
+                    y: platformY,
+                    width: platformWidth,
+                    height: PLATFORM_THICKNESS,
+                    color: color,
+                    source: 'ml-detection',
+                    detection: detection
+                });
+            }
+            
+            // Merge nearby platforms on similar Y positions
+            return mergePlatformCandidates(platformCandidates);
+        }
+
+        // Merge platform candidates that are on similar Y levels and close horizontally
+        function mergePlatformCandidates(candidates) {
+            if (candidates.length === 0) return [];
+            
+            // Sort by Y then X
+            candidates.sort((a, b) => a.y - b.y || a.x - b.x);
+            
+            const merged = [];
+            let current = { ...candidates[0] };
+            
+            for (let i = 1; i < candidates.length; i++) {
+                const next = candidates[i];
+                
+                // Merge if on same Y level (within tolerance) and horizontally adjacent/overlapping
+                const sameRow = Math.abs(next.y - current.y) < PLATFORM_THICKNESS;
+                const adjacent = next.x <= current.x + current.width + PLATFORM_MERGE_GAP_PX + 20;
+                
+                if (sameRow && adjacent) {
+                    // Extend current platform
+                    const newRight = Math.max(current.x + current.width, next.x + next.width);
+                    current.width = newRight - current.x;
+                } else {
+                    merged.push(current);
+                    current = { ...next };
+                }
+            }
+            merged.push(current);
+            
+            return merged;
+        }
+
+        // ==========================================
+        // End ONNX ML Detection Functions
+        // ==========================================
+
         // Process image and create platforms
-        function processImage(image) {
+        async function processImage(image) {
             // Store the image for background rendering
             backgroundImage = image;
 
@@ -965,6 +1332,7 @@
             debugGridSize = gridSize;
             debugHelperPlatforms = [];
             debugSolidGrid = null;
+            debugDetectedObjects = [];
 
             // Helper function to detect edges (helps identify objects better)
             function hasEdge(x, y, width, height, data) {
@@ -1266,9 +1634,65 @@
                 }
             }
 
+            // Build grid-based platforms (always run as baseline/fallback)
             const grid = buildSolidGrid();
             debugSolidGrid = grid.solid;
-            platforms = extractTopSurfacesFromGrid(grid);
+            let gridBasedPlatforms = extractTopSurfacesFromGrid(grid);
+
+            // Try ML-based object detection if enabled
+            let mlPlatforms = [];
+            if (mlDetectionEnabled && onnxModelLoaded && onnxSession) {
+                try {
+                    updateMLStatus('Detecting objects...');
+                    const detections = await detectObjectsWithONNX(width, height);
+                    debugDetectedObjects = detections;
+                    
+                    if (detections.length > 0) {
+                        console.log(`ML detection found ${detections.length} objects`);
+                        mlPlatforms = mapObjectsToPlatforms(detections, width, height);
+                        
+                        // Convert ML platform candidates to Platform objects
+                        mlPlatforms = mlPlatforms.map(p => 
+                            new Platform(p.x, p.y, p.width, p.height, p.color, 'ml')
+                        );
+                        
+                        updateMLStatus(`${detections.length} objects detected`);
+                    } else {
+                        updateMLStatus('No objects detected');
+                    }
+                } catch (err) {
+                    console.warn('ML detection failed during inference:', err);
+                    updateMLStatus('Detection failed');
+                }
+            }
+
+            // Combine platforms: ML platforms take priority, then grid-based fill gaps
+            // If ML detection is enabled and found platforms, prioritize those
+            if (mlDetectionEnabled && mlPlatforms.length > 0) {
+                // Use ML platforms as primary, with grid-based as supplement
+                platforms = [...mlPlatforms];
+                
+                // Add grid-based platforms that don't significantly overlap with ML platforms
+                for (const gridPlatform of gridBasedPlatforms) {
+                    let overlapsML = false;
+                    for (const mlPlatform of mlPlatforms) {
+                        const overlap = !(gridPlatform.x + gridPlatform.width < mlPlatform.x ||
+                            gridPlatform.x > mlPlatform.x + mlPlatform.width ||
+                            gridPlatform.y + gridPlatform.height < mlPlatform.y - 10 ||
+                            gridPlatform.y > mlPlatform.y + mlPlatform.height + 10);
+                        if (overlap) {
+                            overlapsML = true;
+                            break;
+                        }
+                    }
+                    if (!overlapsML) {
+                        platforms.push(gridPlatform);
+                    }
+                }
+            } else {
+                // Fall back to grid-based only
+                platforms = gridBasedPlatforms;
+            }
 
             // Add a ground platform at the bottom (darker and more opaque)
             platforms.push(new Platform(0, height - 20, width, 20, 'rgba(100, 60, 20, 0.8)', 'ground'));
@@ -1298,10 +1722,10 @@
             const spawnCheckHeight = 40; // Player height + buffer
             
             platforms = platforms.filter(platform => {
-                // Keep non-photo platforms (ground/start/goal/helper)
-                if (platform.kind !== 'photo') return true;
+                // Keep non-photo/non-ml platforms (ground/start/goal/helper)
+                if (platform.kind !== 'photo' && platform.kind !== 'ml') return true;
 
-                // Remove photo platforms that overlap with spawn area
+                // Remove photo/ml platforms that overlap with spawn area
                 const overlaps = !(platform.x + platform.width < spawnCheckX ||
                     platform.x > spawnCheckX + spawnCheckWidth ||
                     platform.y + platform.height < spawnCheckY ||
@@ -1418,6 +1842,35 @@
             ctx.lineWidth = 2;
             for (const p of debugHelperPlatforms) {
                 ctx.strokeRect(p.x, p.y, p.width, p.height);
+            }
+
+            // ML detected objects overlay
+            if (debugDetectedObjects && debugDetectedObjects.length > 0) {
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'left';
+                
+                for (const detection of debugDetectedObjects) {
+                    const [x, y, w, h] = detection.bbox;
+                    
+                    // Draw bounding box
+                    if (detection.isPlatformable) {
+                        ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
+                    } else {
+                        ctx.strokeStyle = 'rgba(255, 165, 0, 0.8)';
+                    }
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, w, h);
+                    
+                    // Draw label background
+                    const label = `${detection.class} (${Math.round(detection.confidence * 100)}%)`;
+                    const textWidth = ctx.measureText(label).width;
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(x, y - 16, textWidth + 6, 16);
+                    
+                    // Draw label text
+                    ctx.fillStyle = detection.isPlatformable ? '#00ff00' : '#ffa500';
+                    ctx.fillText(label, x + 3, y - 4);
+                }
             }
 
             ctx.restore();
@@ -1572,6 +2025,29 @@
             debugOverlayToggle.checked = DEBUG_DEFAULT_ENABLED;
             debugOverlayToggle.addEventListener('change', () => {
                 debugOverlayEnabled = Boolean(debugOverlayToggle.checked);
+            });
+        }
+
+        // ML Detection toggle handling
+        const mlDetectionToggle = document.getElementById('mlDetectionToggle');
+        if (mlDetectionToggle) {
+            mlDetectionToggle.checked = ML_DETECTION_ENABLED_DEFAULT;
+            mlDetectionToggle.addEventListener('change', async () => {
+                mlDetectionEnabled = Boolean(mlDetectionToggle.checked);
+                
+                if (mlDetectionEnabled && !onnxModelLoaded && !onnxModelLoading) {
+                    // Start loading the ONNX model when user enables ML detection
+                    const success = await initONNXModel();
+                    if (!success) {
+                        // If loading fails, disable the toggle
+                        mlDetectionToggle.checked = false;
+                        mlDetectionEnabled = false;
+                    }
+                } else if (mlDetectionEnabled && onnxModelLoaded) {
+                    updateMLStatus('ML ready');
+                } else {
+                    updateMLStatus('');
+                }
             });
         }
 
