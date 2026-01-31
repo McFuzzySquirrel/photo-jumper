@@ -43,6 +43,9 @@ Copilot should prioritize:
 
 Detected image geometry must be treated as **input hints**, not ground truth.
 
+**Current approach:** Grid-based brightness/edge sampling (see ADR 0003)  
+**Future exploration:** ONNX Runtime Web for semantic object detection (see [Object Detection Research](../../learning/journey/research/object-detection.md))
+
 Copilot must ensure:
 
 - Lines are filtered, normalized, and merged before becoming platforms
@@ -50,6 +53,8 @@ Copilot must ensure:
 - Nearly collinear lines are merged into single platforms
 - Near-horizontal lines are snapped to true horizontal within tolerance
 - Platform generation respects gameplay constraints even if it alters photo fidelity
+- Any ML-based detection (if implemented) must be optional and fall back to grid-based method
+- ML-detected objects must still pass through all gameplay constraints (reachability, fairness, etc.)
 
 ---
 
@@ -133,6 +138,8 @@ Copilot must:
 - Keep physics lightweight and deterministic
 - Expose tunable values instead of hardcoding numbers
 - Prefer clarity and readability over cleverness
+- If implementing ML-based object detection (ONNX), ensure it's lazy-loaded and optional
+- Maintain single-file `index.html` philosophy where possible (CDN imports are acceptable)
 
 ---
 

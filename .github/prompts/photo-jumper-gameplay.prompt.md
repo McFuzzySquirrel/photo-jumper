@@ -54,12 +54,17 @@ When proposing or modifying code, reason in this order:
 
 ## Photo → Platform Rules You Must Enforce
 
+**Current detection method:** Grid-based brightness/edge sampling (ADR 0003)  
+**Future exploration:** ONNX-based object detection for semantic understanding ([research doc](../../learning/journey/research/object-detection.md))
+
 - Treat detected lines as *suggestions*, not truth
 - Filter noisy or low-confidence lines
 - Merge nearly collinear segments
 - Snap near-horizontal lines to horizontal
 - Enforce minimum platform width and thickness
 - Discard or modify geometry that violates gameplay rules
+- If ML-based detection is added, it must remain optional with grid-based fallback
+- ML-detected platforms must pass all existing gameplay constraints
 
 You may **insert helper platforms or adjust geometry** to ensure playability.
 
@@ -127,6 +132,7 @@ You must mentally verify:
 - Are deaths explainable?
 - Would a player feel cheated?
 - Would a learner understand this code?
+- If modifying platform detection, does it work with both grid-based and potential future ML-based approaches?
 
 If the answer to any is “no”, revise the solution.
 
