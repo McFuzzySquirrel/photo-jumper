@@ -71,6 +71,32 @@ A web-based platform jumping game that converts your photos into playable levels
 
 **Tip**: Try photos of your pets, living room, parking lot, or zoo for best ML results!
 
+## 📱 Play on Mobile (Quick Start)
+
+**The easiest way to play on your phone:**
+
+1. **Visit on your mobile browser:**
+   ```
+   https://mcfuzzysquirrel.github.io/photo-jumper/
+   ```
+   (Replace with your actual GitHub Pages URL)
+
+2. **Add to Home Screen:**
+   - **iOS (Safari):** Tap Share (⎵) → "Add to Home Screen"
+   - **Android (Chrome):** Tap Menu (⋮) → "Add to Home Screen"
+
+3. **Launch & Play:**
+   - Tap the icon on your home screen
+   - Works like a native app!
+   - Works offline after first visit
+   - No app store needed!
+
+**First time setup:** (~10 seconds)
+- Upload or take a photo
+- Enable "ML object detection" (optional - takes 5-10s first time)
+- Touch controls automatically appear
+- Start playing!
+
 ## Install as App (PWA)
 
 Photo Jumper is a Progressive Web App (PWA) that can be installed on your device:
@@ -80,30 +106,44 @@ Photo Jumper is a Progressive Web App (PWA) that can be installed on your device
 2. Click the install icon (⊕) in the address bar
 3. Click "Install"
 
-**Mobile (Android/iOS):**
-1. Visit the game URL in your browser
-2. Tap "Add to Home Screen" (from browser menu or prompt)
-3. The app will appear on your home screen
+**Mobile - iOS (Safari):**
+1. Visit the game URL in Safari (must use Safari, not Chrome)
+2. Tap the Share button (⎵) at the bottom
+3. Scroll down and tap "Add to Home Screen"
+4. Tap "Add" (top right)
+5. App appears on home screen - tap to launch!
+
+**Mobile - Android (Chrome):**
+1. Visit the game URL in Chrome
+2. Tap the menu (⋮) → "Add to Home Screen"
+3. Or tap the install banner when it appears
+4. Tap "Install"
+5. App appears on home screen - tap to launch!
 
 Once installed, Photo Jumper works offline and launches like a native app!
 
 ## Quick Start
 
+**Play Online (Easiest):**
+
+Visit the live version:
+```
+https://mcfuzzysquirrel.github.io/photo-jumper/
+```
+
+Then follow the "Play on Mobile" section above to install on your phone!
+
+**Play Locally:**
+
 Simply open `index.html` in any modern web browser. No installation or build process required!
 
-Note: the in-game feedback form requires running the local server (below). If you open the file directly (`file://`), gameplay works but feedback submission will not.
+Note: the in-game feedback form requires running the local server (below). If you open the file directly (`file://`), gameplay works but feedback submission and ML detection will not work.
 
-Alternatively, you can serve it with a local web server:
+**Run Local Server:**
 
 ```bash
-# Python 3
-python3 -m http.server 8080
-
-# Python 2
-python -m SimpleHTTPServer 8080
-
-# Node.js (with http-server)
-npx http-server -p 8080
+npm install
+npm start
 ```
 
 Then navigate to `http://localhost:8080` in your browser.
@@ -216,6 +256,33 @@ How to follow it:
 git fetch origin
 git switch learning/journey
 ```
+
+## Troubleshooting
+
+### ML Detection Issues
+
+**"ML detection failed to load" error:**
+- **First time:** ML downloads ~8 MB from CDN (takes 5-10 seconds)
+- **Solution:** Wait for download, check internet connection
+- **Offline:** After first load, ML works offline (cached)
+
+**"Failed to load external data file" error:**
+- Model file didn't load
+- **Solution:** Refresh the page, clear browser cache
+- GitHub Pages might still be deploying (~2 min after push)
+
+**ML checkbox enabled but no platforms created:**
+- Photo might not have detectable objects
+- Enable "Debug overlay" to see what was detected
+- Try photos with: pets, people, furniture, vehicles
+- See console (F12) for detection results
+
+**iOS Safari specific issues:**
+- Must use Safari for "Add to Home Screen" (not Chrome)
+- Camera permission needed for "Take Photo"
+- First visit requires internet (for ML files)
+
+For complete troubleshooting, see [docs/ONNX_SETUP.md](docs/ONNX_SETUP.md)
 
 ## How It Works
 
