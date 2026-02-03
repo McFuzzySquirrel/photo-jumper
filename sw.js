@@ -1,8 +1,8 @@
 // Photo Jumper Service Worker
 // Enables offline play and PWA installation
 
-const CACHE_NAME = 'photo-jumper-v1';
-const OFFLINE_CACHE_NAME = 'photo-jumper-offline-v1';
+const CACHE_NAME = 'photo-jumper-v2';
+const OFFLINE_CACHE_NAME = 'photo-jumper-offline-v2';
 
 // Core files to cache for offline use
 const CORE_ASSETS = [
@@ -84,9 +84,53 @@ self.addEventListener('fetch', (event) => {
   
   // Skip cross-origin requests except for CDN assets we want to cache
   if (url.origin !== self.location.origin) {
-    // Cache ONNX runtime from CDN
-    if (url.href.includes('onnxruntime-web') || url.href.includes('ort.min.js')) {
-      event.respondWith(cacheFirstStrategy(event.request));
+    // Cache ONNX runtime and WASM files from CDN
+    if (url.href.includes('onnxruntime-web') || 
+        url.href.includes('ort.min.js') || 
+        url.href.includes('ort-wasm') ||
+        url.href.includes('.wasm')) {
+      event.respondWith(
+        caches.match(event.request).then(cachedResponse => {
+          if (cachedResponse) {
+            console.log('[SW] Serving cached CDN asset:', event.request.url);
+            return cachedResponse;
+          }
+          return fetch(event.request).then(response => {
+            if (response.ok) {
+              const cache = caches.open(OFFLINE_CACHE_NAME);
+              cache.then(c => c.put(event.request, response.clone()));
+              console.log('[SW] Cached CDN asset:', event.request.url);
+            }
+            return response;
+          }).catch(err => {
+            console.warn('[SW] Failed to fetch CDN asset:', event.request.url, err);
+            throw err;
+          });
+        })
+      );
+      return;
+    }
+    // Cache YOLOv8 model from CDN
+    if (url.href.includes('yolov8') && url.href.includes('.onnx')) {
+      event.respondWith(
+        caches.match(event.request).then(cachedResponse => {
+          if (cachedResponse) {
+            console.log('[SW] Serving cached model:', event.request.url);
+            return cachedResponse;
+          }
+          return fetch(event.request).then(response => {
+            if (response.ok) {
+              const cache = caches.open(OFFLINE_CACHE_NAME);
+              cache.then(c => c.put(event.request, response.clone()));
+              console.log('[SW] Cached model:', event.request.url);
+            }
+            return response;
+          }).catch(err => {
+            console.warn('[SW] Failed to fetch model:', event.request.url, err);
+            throw err;
+          });
+        })
+      );
       return;
     }
     // Let other cross-origin requests pass through
@@ -94,8 +138,30 @@ self.addEventListener('fetch', (event) => {
   }
   
   // For ML assets, use cache-first (they're large and don't change often)
-  if (ML_ASSETS.some(asset => url.pathname.endsWith(asset.replace('/', '')))) {
-    event.respondWith(cacheFirstStrategy(event.request));
+  // But skip if it's a local file that might not exist (allow fallback to work)
+  const isLocalMLAsset = ML_ASSETS.some(asset => url.pathname.endsWith(asset.replace('/', '')));
+  if (isLocalMLAsset) {
+    // Only intercept if we already have it cached
+    event.respondWith(
+      caches.match(event.request).then(cachedResponse => {
+        if (cachedResponse) {
+          console.log('[SW] Serving cached ML asset:', event.request.url);
+          return cachedResponse;
+        }
+        // Not cached - let browser handle it (will 404 for local, then JS fallback will try CDN)
+        return fetch(event.request).then(response => {
+          if (response.ok) {
+            const cache = caches.open(OFFLINE_CACHE_NAME);
+            cache.then(c => c.put(event.request, response.clone()));
+          }
+          return response;
+        }).catch(err => {
+          // Let 404s pass through - this allows JS fallback to work
+          console.log('[SW] Local ML asset not found (expected):', event.request.url);
+          throw err;
+        });
+      })
+    );
     return;
   }
   

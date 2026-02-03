@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#764ba2">
     <meta name="description" content="Turn your photos into playable platformer levels! Upload a photo and jump through your own pictures.">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Photo Jumper">
@@ -682,19 +683,19 @@
 
         // ONNX ML detection configuration
         const ML_DETECTION_ENABLED_DEFAULT = false;
-        // Model URLs: Try local first, then CDN fallbacks
-        // To self-host: place yolov8n.onnx in a 'models/' folder alongside index.html
-        // Model can be exported from Ultralytics: https://docs.ultralytics.com/modes/export/
+        // Model URLs: Try CDN first for deployments, local as fallback
+        // For local development: place yolov8n.onnx in 'models/' folder
+        // For production: CDN is preferred (smaller deployment, no large files in repo)
         const ML_MODEL_URLS = [
-            'models/yolov8n.onnx',  // Local model (preferred for reliability)
-            'https://cdn.jsdelivr.net/gh/aspect-technology/yolov8-onnx@main/models/yolov8n.onnx',  // CDN fallback
+            'https://cdn.jsdelivr.net/gh/aspect-technology/yolov8-onnx@main/models/yolov8n.onnx',  // CDN (preferred for production)
+            'models/yolov8n.onnx',  // Local fallback (for development/offline)
         ];
-        // ONNX Runtime URLs: Try local first, then CDN
-        // To self-host: download ort.min.js and ort-wasm*.wasm files to 'lib/' folder
+        // ONNX Runtime URLs: CDN first for deployments, local fallback
+        // For local development: download ort.min.js and ort-wasm*.wasm files to 'lib/' folder
         // From: https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/
         const ONNX_RUNTIME_URLS = [
-            'lib/ort.min.js',  // Local runtime (preferred)
-            'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js',  // CDN fallback
+            'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js',  // CDN (preferred for production)
+            'lib/ort.min.js',  // Local fallback (for development/offline)
         ];
         const ML_CONFIDENCE_THRESHOLD = 0.5;
         const ML_INPUT_SIZE = 640;  // YOLOv8n expects 640x640 input images
@@ -705,10 +706,32 @@
         
         // COCO classes that are suitable for platforms (horizontal surfaces)
         const PLATFORMABLE_CLASSES = [
-            'bench', 'chair', 'couch', 'bed', 'dining table', 'desk',
-            'toilet', 'tv', 'laptop', 'keyboard', 'book', 'suitcase',
-            'refrigerator', 'oven', 'microwave', 'sink', 'car', 'bus',
-            'truck', 'boat', 'train', 'airplane'
+            // Furniture - obvious platforms
+            'bench', 'chair', 'couch', 'bed', 'dining table', 'desk', 'toilet',
+            
+            // Electronics - flat top surfaces
+            'tv', 'laptop', 'keyboard', 'book', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator',
+            
+            // Vehicles - can stand on top
+            'car', 'bus', 'truck', 'boat', 'train', 'airplane', 'bicycle', 'motorcycle',
+            
+            // Large objects - stable platforms
+            'suitcase', 'backpack', 'skateboard', 'surfboard', 
+            
+            // Sports equipment - flat surfaces
+            'snowboard', 'skis',
+            
+            // Containers - can stand on
+            'vase', 'potted plant', 'bowl',
+            
+            // Animals - because why not! 🦒🐘🐴
+            'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe',
+            
+            // People - jump on heads!
+            'person',
+            
+            // Other - potential platforms
+            'clock', 'teddy bear', 'remote', 'mouse', 'cell phone'
         ];
         
         // COCO class names (80 classes)
@@ -1000,7 +1023,13 @@
 
         // Lazy-load ONNX Runtime with fallback URLs
         async function loadONNXRuntime() {
-            if (typeof ort !== 'undefined') return true;
+            if (typeof ort !== 'undefined') {
+                // Already loaded, just ensure WASM path is set
+                if (!ort.env.wasm.wasmPaths) {
+                    ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/';
+                }
+                return true;
+            }
             
             for (const runtimeUrl of ONNX_RUNTIME_URLS) {
                 try {
@@ -1013,13 +1042,33 @@
                         document.head.appendChild(script);
                     });
                     
+                    // Wait a bit for ort to become available (async initialization)
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    
                     // Verify ort is available after script loads
                     if (typeof ort !== 'undefined') {
                         console.log('ONNX Runtime loaded successfully from:', runtimeUrl);
+                        
+                        // Configure WASM paths - point to the same location as the runtime
+                        if (runtimeUrl.includes('://')) {
+                            // CDN - point to CDN for WASM files
+                            const cdnBase = runtimeUrl.substring(0, runtimeUrl.lastIndexOf('/') + 1);
+                            ort.env.wasm.wasmPaths = cdnBase;
+                            console.log('ONNX WASM path set to CDN:', ort.env.wasm.wasmPaths);
+                        } else {
+                            // Local - point to local lib folder
+                            ort.env.wasm.wasmPaths = 'lib/';
+                            console.log('ONNX WASM path set to local:', ort.env.wasm.wasmPaths);
+                        }
+                        
+                        // Set number of threads for better performance
+                        ort.env.wasm.numThreads = 1;
+                        
                         return true;
                     }
                 } catch (err) {
-                    console.warn('Failed to load ONNX Runtime from:', runtimeUrl, err.message);
+                    console.error('Failed to load ONNX Runtime from:', runtimeUrl);
+                    console.error('Error details:', err);
                     // Continue to next URL
                 }
             }
@@ -1049,7 +1098,7 @@
                         console.log('Attempting to load model from:', modelUrl);
                         
                         onnxSession = await ort.InferenceSession.create(modelUrl, {
-                            executionProviders: ['webgl', 'wasm'],
+                            executionProviders: ['wasm'],
                             graphOptimizationLevel: 'all'
                         });
                         
@@ -1059,7 +1108,8 @@
                         console.log('ONNX model loaded successfully from:', modelUrl);
                         return true;
                     } catch (urlError) {
-                        console.warn(`Failed to load model from ${modelUrl}:`, urlError.message);
+                        console.error(`Failed to load model from ${modelUrl}:`, urlError);
+                        console.error('Error stack:', urlError.stack);
                         lastError = urlError;
                         // Continue to try next URL
                     }
@@ -1163,8 +1213,16 @@
                     const inferenceTime = performance.now() - startTime;
                     console.log(`ONNX inference completed in ${inferenceTime.toFixed(0)}ms`);
                     
-                    // Process YOLO output
-                    const output = results.output0;
+                    // Process YOLO output - different models use different output names
+                    const output = results.predictions || results.output0 || results[Object.keys(results)[0]];
+                    
+                    if (!output) {
+                        console.error('No valid output found. Available keys:', Object.keys(results));
+                        return [];
+                    }
+                    
+                    console.log('Using output tensor with dims:', output.dims);
+                    
                     const detections = processYOLOOutput(output, width, height, scale, offsetX, offsetY);
                     
                     return detections;
@@ -1180,8 +1238,28 @@
 
         // Process YOLO v8 output format [1, 84, 8400] -> bounding boxes
         function processYOLOOutput(output, originalWidth, originalHeight, scale, offsetX, offsetY) {
-            const data = output.data;
-            const [batch, features, numBoxes] = output.dims; // [1, 84, 8400]
+            if (!output) {
+                console.error('Output is undefined');
+                return [];
+            }
+            
+            // ONNX Runtime Web returns tensors, need to get data from cpuData or data
+            const data = output.cpuData || output.data;
+            
+            if (!data) {
+                console.error('Output data is undefined. Output:', output);
+                console.error('Available properties:', Object.keys(output));
+                return [];
+            }
+            
+            const dims = output.dims;
+            if (!dims || dims.length !== 3) {
+                console.error('Invalid output dimensions:', dims);
+                return [];
+            }
+            
+            const [batch, features, numBoxes] = dims; // Expected: [1, 84, 8400]
+            console.log(`Processing YOLO output: ${batch}x${features}x${numBoxes}`);
             
             const detections = [];
             
@@ -1717,13 +1795,25 @@
             // Try ML-based object detection if enabled
             let mlPlatforms = [];
             if (mlDetectionEnabled && onnxModelLoaded && onnxSession) {
+                console.log('🤖 Running ML object detection...');
                 try {
                     updateMLStatus('Detecting objects...');
                     const detections = await detectObjectsWithONNX(width, height);
                     debugDetectedObjects = detections;
                     
+                    console.log(`ML detection found ${detections.length} total objects`);
+                    
+                    // Log all detections for debugging
                     if (detections.length > 0) {
-                        console.log(`ML detection found ${detections.length} objects`);
+                        console.log('Detected objects:', detections.map(d => 
+                            `${d.class} (${(d.confidence * 100).toFixed(1)}%) ${d.isPlatformable ? '✓ platformable' : '✗ not platformable'}`
+                        ).join(', '));
+                    }
+                    
+                    const platformableDetections = detections.filter(d => d.isPlatformable);
+                    console.log(`${platformableDetections.length} of those are platformable`);
+                    
+                    if (platformableDetections.length > 0) {
                         mlPlatforms = mapObjectsToPlatforms(detections, width, height);
                         
                         // Convert ML platform candidates to Platform objects
@@ -1731,8 +1821,14 @@
                             new Platform(p.x, p.y, p.width, p.height, p.color, 'ml')
                         );
                         
-                        updateMLStatus(`${detections.length} objects detected`);
+                        updateMLStatus(`${platformableDetections.length} objects → platforms`);
+                    } else if (detections.length > 0) {
+                        console.log('ℹ️ Objects detected but none are platformable. Enable debug overlay to see them.');
+                        updateMLStatus(`${detections.length} objects (none platformable)`);
                     } else {
+                        console.log('ℹ️ No objects detected. Try photos with furniture, vehicles, or electronics.');
+                        console.log('   Platformable objects: chairs, tables, couches, cars, laptops, etc.');
+                        console.log('   Note: Buildings/architecture are not detected - use grid-based detection for those.');
                         updateMLStatus('No objects detected');
                     }
                 } catch (err) {
@@ -1919,8 +2015,8 @@
                 ctx.strokeRect(p.x, p.y, p.width, p.height);
             }
 
-            // ML detected objects overlay
-            if (debugDetectedObjects && debugDetectedObjects.length > 0) {
+            // ML detected objects overlay (only in debug mode)
+            if (debugOverlayEnabled && debugDetectedObjects && debugDetectedObjects.length > 0) {
                 ctx.font = '12px Arial';
                 ctx.textAlign = 'left';
                 

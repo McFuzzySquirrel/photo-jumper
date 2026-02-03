@@ -37,6 +37,7 @@ A web-based platform jumping game that converts your photos into playable levels
 
 - 📸 **Photo Upload**: Upload a photo from your device or take one with your camera
 - 🎨 **Dynamic Level Generation**: Photos are automatically converted into platforms based on brightness
+- 🤖 **ML Object Detection (Experimental)**: Optional ONNX-based detection that creates platforms from 51 object types including furniture, vehicles, electronics, animals, and people!
 - 🖼️ **Photo Background**: Your photo is displayed as the game background, making you feel like you're playing inside the picture
 - 🎮 **Classic Platform Gameplay**: Jump and navigate through your photo-based levels
 - 🕹️ **Multiple Control Options**:
@@ -51,13 +52,24 @@ A web-based platform jumping game that converts your photos into playable levels
 
 1. Open `index.html` in your web browser
 2. Click "Upload Photo" to select an image from your device, or "Take Photo" to use your camera
-3. The photo will be converted into a platform level (darker areas become platforms)
+3. The photo will be converted into a platform level:
+   - **Default**: Grid-based detection (darker areas become platforms)
+   - **ML Detection (Optional)**: Enable the checkbox to detect 51 object types including:
+     - Furniture (chairs, tables, couches, beds)
+     - Vehicles (cars, buses, trains, airplanes, bicycles)
+     - Electronics (laptops, TVs, keyboards, microwaves)
+     - Animals (cats, dogs, horses, elephants, giraffes, bears)
+     - People (jump on heads Mario-style!)
+     - Sports equipment (skateboards, surfboards, snowboards)
+     - And more!
 4. Use the controls to navigate:
    - **Move**: Arrow Keys or WASD
    - **Jump**: Space or Up Arrow
    - **Mobile**: Touch controls
 5. Try to navigate through the level without falling!
 6. Click "New Photo" to load a different image
+
+**Tip**: Try photos of your pets, living room, parking lot, or zoo for best ML results!
 
 ## Install as App (PWA)
 
@@ -207,13 +219,30 @@ git switch learning/journey
 
 ## How It Works
 
-The game uses HTML5 Canvas to:
+The game uses HTML5 Canvas and modern web technologies to:
+
+### Grid-Based Detection (Default)
 1. Process uploaded images and analyze brightness levels
 2. Generate platforms from darker areas of the image
-3. Display the original photo as the game background
-4. Render semi-transparent platforms with visible borders so you can see the photo beneath
-5. Apply physics-based platform game mechanics with gravity and collision detection
-6. Support both keyboard and touch input for cross-platform compatibility
+3. Apply edge detection to find solid surfaces
+4. Filter and merge platforms for optimal gameplay
+
+### ML Object Detection (Optional)
+1. Load ONNX Runtime Web from CDN (no installation needed!)
+2. Run YOLOv8n object detection model in the browser
+3. Detect 51 object types (furniture, vehicles, animals, people, electronics, etc.)
+4. Generate platforms from detected object boundaries
+5. Combine with grid-based platforms for hybrid approach
+
+### Gameplay
+1. Display the original photo as the game background
+2. Render semi-transparent platforms with visible borders
+3. Apply physics-based mechanics with gravity and collision detection
+4. Support both keyboard and touch input for cross-platform compatibility
+
+**All processing happens in your browser - no server required!**
+
+For more details on ML detection, see [docs/ML_DETECTION_GUIDE.md](docs/ML_DETECTION_GUIDE.md)
 
 ## Browser Compatibility
 
