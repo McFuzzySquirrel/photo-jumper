@@ -21,3 +21,8 @@ feedback/
 # Temporary files
 tmp/
 temp/
+
+# ML Models (large files - use CDN instead)
+models/*.onnx
+lib/ort*.wasm
+lib/ort*.js
