@@ -1123,13 +1123,20 @@
                 onnxModelLoaded = false;
                 updateMLStatus('ML failed - see console');
                 console.error('Failed to load ML detection:', err);
-                console.info('=== ML Detection Setup Instructions ===');
-                console.info('1. Run the app via a web server (not file://), e.g.: npm start');
-                console.info('2. For offline/self-hosted setup:');
-                console.info('   - Model: Download yolov8n.onnx → models/ folder');
-                console.info('     From: https://github.com/ultralytics/assets/releases');
-                console.info('   - Runtime: Download ort.min.js and ort-wasm*.wasm → lib/ folder');
-                console.info('     From: https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/');
+                console.info('=== ML Detection Troubleshooting ===');
+                console.info('The app is running via HTTPS/web server (good!)');
+                console.info('ML assets are loading from CDN (no downloads needed).');
+                console.info('');
+                console.info('Possible issues:');
+                console.info('1. CDN temporarily unavailable - try refreshing');
+                console.info('2. Network/firewall blocking CDN - check connection');
+                console.info('3. Browser compatibility - try Chrome/Edge');
+                console.info('');
+                console.info('CDN URLs tried:');
+                console.info('- Runtime: https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/');
+                console.info('- Model: https://cdn.jsdelivr.net/gh/aspect-technology/yolov8-onnx@main/');
+                console.info('');
+                console.info('See docs/ONNX_SETUP.md for full troubleshooting guide.');
                 return false;
             }
         }
@@ -2216,15 +2223,17 @@
                         // If loading fails, disable the toggle and show helpful message
                         mlDetectionToggle.checked = false;
                         mlDetectionEnabled = false;
-                        alert('ML detection failed to load. To fix:\n\n' +
-                            '1. Run the app via a web server (not file://)\n' +
-                            '   e.g., npm start\n\n' +
-                            '2. For offline use, also download:\n' +
-                            '   - yolov8n.onnx → models/ folder\n' +
-                            '   - ort.min.js → lib/ folder\n' +
-                            '   - ort-wasm*.wasm files → lib/ folder\n' +
-                            '   From: https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/\n\n' +
-                            'See browser console for details.');
+                        
+                        // Show actual error from console
+                        const errorMsg = onnxLoadError?.message || 'Unknown error';
+                        alert('ML detection failed to load.\n\n' +
+                            'Error: ' + errorMsg + '\n\n' +
+                            'Check browser console (F12) for details.\n\n' +
+                            'Common fixes:\n' +
+                            '- Refresh the page\n' +
+                            '- Check internet connection (CDN needed)\n' +
+                            '- Clear browser cache\n\n' +
+                            'See docs/ONNX_SETUP.md for full troubleshooting.');
                     }
                 } else if (mlDetectionEnabled && onnxModelLoaded) {
                     updateMLStatus('ML ready');
