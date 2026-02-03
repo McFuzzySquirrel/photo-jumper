@@ -47,8 +47,8 @@ We will implement ONNX-based object detection as an **optional, experimental fea
      - Download from [onnxruntime-web CDN](https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/)
 
 2. **Object-to-Platform Mapping**
-   - **Bottom edge heuristic**: Use the bottom edge of detected objects as platform surfaces
-   - **Category filtering**: Prioritize "platformable" objects (tables, chairs, benches, laptops, etc.)
+   - **Top edge heuristic**: Use the top edge of detected objects as platform surfaces (where you'd actually stand)
+   - **Category filtering**: Prioritize "platformable" objects (tables, chairs, benches, laptops, animals, people, etc.)
    - **Confidence threshold**: Filter detections below 0.5 confidence
 
 3. **Platform Generation**

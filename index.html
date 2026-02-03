@@ -1368,16 +1368,16 @@
             return unionArea > 0 ? interArea / unionArea : 0;
         }
 
-        // Map detected objects to platform candidates using bottom-edge heuristic
+        // Map detected objects to platform candidates using top-edge heuristic
         function mapObjectsToPlatforms(detections, canvasWidth, canvasHeight) {
             const platformCandidates = [];
             
             for (const detection of detections) {
                 const [x, y, w, h] = detection.bbox;
                 
-                // Use bottom edge of detected object as platform surface
-                // For platformable objects, the bottom edge represents where you could stand
-                const platformY = y + h - PLATFORM_THICKNESS;
+                // Use TOP edge of detected object as platform surface
+                // This is where you would realistically stand on the object (top of chair, car, etc.)
+                const platformY = y;  // Top of the detected object
                 const platformX = x;
                 const platformWidth = w;
                 
