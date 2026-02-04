@@ -307,6 +307,49 @@
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         }
 
+        /* Zoom control buttons */
+        .zoom-controls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 102;
+        }
+
+        .game-canvas-container.fullscreen ~ .zoom-controls {
+            display: flex;
+        }
+
+        .zoom-btn {
+            width: 50px;
+            height: 50px;
+            font-size: 24px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+        }
+
+        .zoom-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #FFD700;
+            transform: scale(1.1);
+        }
+
+        .zoom-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.95);
+        }
+
         /* Intro screen styles */
         .intro-screen {
             text-align: center;
@@ -539,6 +582,13 @@
             <button class="control-btn" id="rightBtn" aria-label="Move right">▶</button>
         </div>
 
+        <!-- Zoom control buttons -->
+        <div class="zoom-controls" id="zoomControls">
+            <button class="zoom-btn" id="zoomOutBtn" aria-label="Zoom out" title="Zoom out (-)">−</button>
+            <button class="zoom-btn" id="zoomResetBtn" aria-label="Reset zoom" title="Reset zoom (0)">⊙</button>
+            <button class="zoom-btn" id="zoomInBtn" aria-label="Zoom in" title="Zoom in (+)">+</button>
+        </div>
+
         <div class="instructions">
             <h3>How to Play:</h3>
             <p>1. Upload a photo or take one with your camera</p>
@@ -631,11 +681,17 @@
         const rightBtn = document.getElementById('rightBtn');
         const jumpBtn = document.getElementById('jumpBtn');
 
+        // Zoom control buttons
+        const zoomControls = document.getElementById('zoomControls');
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const zoomResetBtn = document.getElementById('zoomResetBtn');
+
         const FEEDBACK_TOKEN_STORAGE_KEY = 'photoJumperFeedbackToken';
 
         // Game configuration constants
         const PLAYER_SIZE = 20;
-        const PLAYER_SPEED = 5;
+        const PLAYER_SPEED = 4;  // Adjusted from 3 - sweet spot between 3 and 5
         const PLAYER_JUMP_POWER = 12;
         const PLAYER_GRAVITY = 0.5;
 
@@ -664,8 +720,7 @@
         const WORD_BAR_AREA_HEIGHT = 30;  // Reduced from 60 to not overlap with score display
         
         // Stuck detection constants
-        // Increased to avoid false positives during normal stationary gameplay (planning, waiting)
-        const STUCK_CHECK_INTERVAL = 5000;  // 5 seconds
+        const STUCK_CHECK_INTERVAL = 15000;  // 15 seconds - increased from 5 for more patience
         const STUCK_MOVEMENT_THRESHOLD = 5;  // pixels
 
         // Letter collection constants
@@ -1849,10 +1904,75 @@
                     
                     const platformHeight = BLOCK_SIZE;  // One block tall
                     const color = platformColorFromBrightness(m.brightness);
-                    platformsOut.push(new Platform(m.x, m.y, Math.min(alignedWidth, width - m.x), platformHeight, color, 'photo'));
+                    const mainPlatform = new Platform(m.x, m.y, Math.min(alignedWidth, width - m.x), platformHeight, color, 'photo');
+                    platformsOut.push(mainPlatform);
+                    
+                    // Add wall blocks at the ends of platforms for better climbing
+                    // Left wall block
+                    if (m.x >= BLOCK_SIZE && mainPlatform.width >= BLOCK_SIZE * 3) {
+                        platformsOut.push(new Platform(
+                            m.x, 
+                            m.y - BLOCK_SIZE, 
+                            BLOCK_SIZE, 
+                            BLOCK_SIZE, 
+                            color, 
+                            'photo'
+                        ));
+                    }
+                    // Right wall block
+                    if (mainPlatform.x + mainPlatform.width + BLOCK_SIZE <= width && mainPlatform.width >= BLOCK_SIZE * 3) {
+                        platformsOut.push(new Platform(
+                            mainPlatform.x + mainPlatform.width - BLOCK_SIZE, 
+                            m.y - BLOCK_SIZE, 
+                            BLOCK_SIZE, 
+                            BLOCK_SIZE, 
+                            color, 
+                            'photo'
+                        ));
+                    }
                 }
 
-                return platformsOut;
+                // Filter out platforms that are too close vertically (minimum 1 block spacing)
+                return filterVerticallyClashingPlatforms(platformsOut);
+            }
+            
+            // Remove platforms that are stacked too closely vertically
+            function filterVerticallyClashingPlatforms(platforms) {
+                const minVerticalGap = BLOCK_SIZE;  // At least 1 block spacing
+                const filtered = [];
+                
+                // Sort by Y position
+                const sorted = [...platforms].sort((a, b) => a.y - b.y);
+                
+                for (let i = 0; i < sorted.length; i++) {
+                    const current = sorted[i];
+                    let tooClose = false;
+                    
+                    // Check if there's a platform directly below that's too close
+                    for (let j = i + 1; j < sorted.length; j++) {
+                        const below = sorted[j];
+                        
+                        // Check if they overlap horizontally
+                        const horizontalOverlap = !(current.x + current.width <= below.x || below.x + below.width <= current.x);
+                        
+                        if (horizontalOverlap) {
+                            const verticalGap = below.y - (current.y + current.height);
+                            
+                            if (verticalGap < minVerticalGap) {
+                                tooClose = true;
+                                break;
+                            }
+                            // Once we find the first platform below with overlap, we can stop checking
+                            break;
+                        }
+                    }
+                    
+                    if (!tooClose) {
+                        filtered.push(current);
+                    }
+                }
+                
+                return filtered;
             }
 
             function addHelperPlatformsIfNeeded(startPlatform, goalSupportPlatform, allPlatforms, limits) {
@@ -1877,8 +1997,8 @@
                     const goalCenter = goalSupportPlatform.x + goalSupportPlatform.width / 2;
 
                     const toward = Math.sign(goalCenter - currentCenter) || 1;
-                    const stepX = limits.maxJumpDx * 0.6;  // Smaller horizontal steps for more platforms
-                    const stepUp = limits.maxJumpUp * 0.5;  // Smaller vertical steps
+                    const stepX = limits.maxJumpDx * 0.55;  // Even smaller horizontal steps
+                    const stepUp = limits.maxJumpUp * 0.45;  // Even smaller vertical steps for gradual climb
 
                     const targetY = Math.max(WORD_BAR_AREA_HEIGHT, current.y - stepUp);
                     
@@ -1908,7 +2028,7 @@
                         }
                         
                         // Try shifting left and right with current width
-                        for (let offset = BLOCK_SIZE; offset <= BLOCK_SIZE * 8; offset += BLOCK_SIZE) {
+                        for (let offset = BLOCK_SIZE; offset <= BLOCK_SIZE * 10; offset += BLOCK_SIZE) {
                             const leftX = Math.max(0, targetX - offset);
                             const rightX = Math.min(width - helperWidth, targetX + offset);
 
@@ -1974,7 +2094,28 @@
                                 placed = true;
                                 failedAttempts = 0;
                             } else {
-                                failedAttempts++;
+                                // Last resort: try placing a stepping stone closer to current platform
+                                const closeHelper = new Platform(
+                                    currentCenter + toward * (BLOCK_SIZE * 2),
+                                    current.y - (BLOCK_SIZE * 2),
+                                    BLOCK_SIZE * 2,
+                                    helperHeight,
+                                    helperColor,
+                                    'helper'
+                                );
+                                
+                                if (!overlapsAny(closeHelper, allPlatforms) &&
+                                    closeHelper.x >= 0 &&
+                                    closeHelper.x + closeHelper.width <= width &&
+                                    closeHelper.y >= WORD_BAR_AREA_HEIGHT) {
+                                    allPlatforms.push(closeHelper);
+                                    debugHelperPlatforms.push(closeHelper);
+                                    current = closeHelper;
+                                    placed = true;
+                                    failedAttempts = 0;
+                                } else {
+                                    failedAttempts++;
+                                }
                             }
                         }
                     }
@@ -3131,6 +3272,38 @@
         jumpBtn.addEventListener('touchcancel', (e) => {
             e.preventDefault();
             touchJumping = false;
+        });
+
+        // Zoom control buttons
+        zoomInBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            camera.zoom = Math.min(camera.maxZoom, camera.zoom + 0.2);
+        });
+
+        zoomOutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            camera.zoom = Math.max(camera.minZoom, camera.zoom - 0.2);
+        });
+
+        zoomResetBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            camera.zoom = 1.0;
+        });
+
+        // Touch support for zoom buttons
+        zoomInBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            camera.zoom = Math.min(camera.maxZoom, camera.zoom + 0.2);
+        });
+
+        zoomOutBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            camera.zoom = Math.max(camera.minZoom, camera.zoom - 0.2);
+        });
+
+        zoomResetBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            camera.zoom = 1.0;
         });
 
         document.addEventListener('keydown', (e) => {
