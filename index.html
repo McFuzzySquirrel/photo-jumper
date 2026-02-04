@@ -642,11 +642,12 @@
         const EDGE_DETECTION_THRESHOLD = 30;  // Reduced from 40 for better edge detection
         const EDGE_BRIGHTNESS_THRESHOLD = 200;  // Increased from 180 to accept more edge-detected platforms
 
-        // Gameplay-first platform constraints
-        const PLATFORM_MIN_WIDTH = 40;
-        const PLATFORM_THICKNESS = 14;
+        // Modular block platform system
+        const BLOCK_SIZE = 20;  // Individual block size (matches GRID_SIZE)
+        const PLATFORM_MIN_WIDTH = 40;  // Must fit at least 2 blocks
+        const PLATFORM_THICKNESS = BLOCK_SIZE;  // One block tall
         const PLATFORM_MERGE_GAP_PX = 0;
-        const HELPERS_MAX_COUNT = 20;  // Increased from 14 for better reachability
+        const HELPERS_MAX_COUNT = 30;  // Increased for better reachability with modular blocks
 
         const DEBUG_DEFAULT_ENABLED = false;
         
@@ -1015,26 +1016,49 @@
             }
 
             draw() {
-                // Draw shadow for depth
+                // Draw platforms as a series of connected square blocks
+                const numBlocks = Math.floor(this.width / BLOCK_SIZE);
+                
+                // Draw shadow for entire platform
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
                 ctx.fillRect(this.x + 2, this.y + 2, this.width, this.height);
                 
-                // Draw main platform fill
-                ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
+                // Draw individual blocks
+                for (let i = 0; i < numBlocks; i++) {
+                    const blockX = this.x + (i * BLOCK_SIZE);
+                    const blockY = this.y;
+                    
+                    // Main block fill
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(blockX, blockY, BLOCK_SIZE, this.height);
+                    
+                    // Block outline
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(blockX, blockY, BLOCK_SIZE, this.height);
+                    
+                    // Top highlight for each block
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(blockX + 1, blockY + 1);
+                    ctx.lineTo(blockX + BLOCK_SIZE - 1, blockY + 1);
+                    ctx.stroke();
+                }
                 
-                // Draw thick black outline for visibility
-                ctx.strokeStyle = '#000';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(this.x, this.y, this.width, this.height);
-                
-                // Add highlight on top edge for 3D effect
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(this.x + 1, this.y + 1);
-                ctx.lineTo(this.x + this.width - 1, this.y + 1);
-                ctx.stroke();
+                // Handle remaining width (partial block at end)
+                const remainingWidth = this.width - (numBlocks * BLOCK_SIZE);
+                if (remainingWidth > 0) {
+                    const blockX = this.x + (numBlocks * BLOCK_SIZE);
+                    const blockY = this.y;
+                    
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(blockX, blockY, remainingWidth, this.height);
+                    
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(blockX, blockY, remainingWidth, this.height);
+                }
             }
         }
 
@@ -1458,12 +1482,14 @@
             for (const detection of detections) {
                 const [x, y, w, h] = detection.bbox;
                 
-                // Use TOP edge as platform surface with moderate thickness
-                // This allows standing on objects while keeping clear air space
+                // Use TOP edge as platform surface with block-aligned dimensions
                 const platformY = y;
                 const platformX = x;
-                const platformWidth = w;
-                const platformHeight = Math.min(h * 0.25, 30);  // Use 25% of height or 30px max
+                
+                // Align width to block boundaries
+                const blockCount = Math.max(2, Math.ceil(w / BLOCK_SIZE));  // At least 2 blocks
+                const platformWidth = blockCount * BLOCK_SIZE;
+                const platformHeight = BLOCK_SIZE;  // One block tall
                 
                 // Skip if platform would be in reserved areas
                 const isStartArea = (platformX < START_AREA_WIDTH && platformY > canvasHeight - START_AREA_HEIGHT);
@@ -1476,6 +1502,7 @@
                 
                 // Skip if platform is outside canvas bounds
                 if (platformY < 0 || platformY > canvasHeight - platformHeight) continue;
+                if (platformX + platformWidth > canvasWidth) continue;
                 
                 // Semi-transparent platforms that show the photo underneath
                 let color;
@@ -1796,13 +1823,18 @@
                 }
                 if (current) merged.push(current);
 
-                // Convert to platform objects with moderate thickness for visibility
+                // Convert to platform objects with block-aligned dimensions
                 const platformsOut = [];
                 for (const m of merged) {
                     if (m.width < PLATFORM_MIN_WIDTH) continue;
-                    const platformHeight = Math.max(PLATFORM_THICKNESS, gridSize);  // At least gridSize thick
+                    
+                    // Align platform width to block boundaries for clean appearance
+                    const blockCount = Math.ceil(m.width / BLOCK_SIZE);
+                    const alignedWidth = blockCount * BLOCK_SIZE;
+                    
+                    const platformHeight = BLOCK_SIZE;  // One block tall
                     const color = platformColorFromBrightness(m.brightness);
-                    platformsOut.push(new Platform(m.x, m.y, m.width, platformHeight, color, 'photo'));
+                    platformsOut.push(new Platform(m.x, m.y, Math.min(alignedWidth, width - m.x), platformHeight, color, 'photo'));
                 }
 
                 return platformsOut;
@@ -1813,8 +1845,9 @@
                     return;
                 }
 
-                const helperWidth = Math.max(PLATFORM_MIN_WIDTH * 2, 80);
-                const helperHeight = PLATFORM_THICKNESS;  // Keep thin for clear navigation
+                // Use smaller, more flexible helper blocks
+                const helperWidthOptions = [BLOCK_SIZE * 4, BLOCK_SIZE * 3, BLOCK_SIZE * 2];  // 80px, 60px, 40px
+                const helperHeight = BLOCK_SIZE;
                 const helperColor = 'rgba(80, 120, 255, 0.9)';
 
                 let current = startPlatform;
@@ -1827,23 +1860,37 @@
                     const goalCenter = goalSupportPlatform.x + goalSupportPlatform.width / 2;
 
                     const toward = Math.sign(goalCenter - currentCenter) || 1;
-                    const stepX = limits.maxJumpDx * 0.8;
-                    const stepUp = limits.maxJumpUp * 0.8;
+                    const stepX = limits.maxJumpDx * 0.7;  // More conservative steps
+                    const stepUp = limits.maxJumpUp * 0.6;  // Smaller vertical steps
 
                     const targetY = Math.max(WORD_BAR_AREA_HEIGHT, current.y - stepUp);
-                    const idealX = currentCenter + toward * stepX - (helperWidth / 2);
-                    let targetX = Math.max(0, Math.min(width - helperWidth, idealX));
+                    
+                    // Try different helper widths to find one that fits
+                    let placed = false;
+                    
+                    for (const helperWidth of helperWidthOptions) {
+                        if (placed) break;
+                        
+                        const idealX = currentCenter + toward * stepX - (helperWidth / 2);
+                        let targetX = Math.max(0, Math.min(width - helperWidth, idealX));
 
-                    const wouldBeInGoalArea = (targetX > width - GOAL_AREA_WIDTH && targetY < GOAL_AREA_HEIGHT);
-                    if (wouldBeInGoalArea) {
-                        targetX = Math.max(0, width - GOAL_AREA_WIDTH - helperWidth - 10);
-                    }
+                        const wouldBeInGoalArea = (targetX > width - GOAL_AREA_WIDTH && targetY < GOAL_AREA_HEIGHT);
+                        if (wouldBeInGoalArea) {
+                            targetX = Math.max(0, width - GOAL_AREA_WIDTH - helperWidth - 10);
+                        }
 
-                    const candidate = new Platform(targetX, targetY, helperWidth, helperHeight, helperColor, 'helper');
+                        const candidate = new Platform(targetX, targetY, helperWidth, helperHeight, helperColor, 'helper');
 
-                    if (overlapsAny(candidate, allPlatforms)) {
-                        let placed = false;
-                        for (let offset = gridSize; offset <= gridSize * 8; offset += gridSize) {
+                        if (!overlapsAny(candidate, allPlatforms)) {
+                            allPlatforms.push(candidate);
+                            debugHelperPlatforms.push(candidate);
+                            current = candidate;
+                            placed = true;
+                            break;
+                        }
+                        
+                        // Try shifting left and right with current width
+                        for (let offset = BLOCK_SIZE; offset <= BLOCK_SIZE * 6; offset += BLOCK_SIZE) {
                             const leftX = Math.max(0, targetX - offset);
                             const rightX = Math.min(width - helperWidth, targetX + offset);
 
@@ -1865,15 +1912,33 @@
                                 break;
                             }
                         }
-
-                        if (!placed) {
-                            return;
-                        }
-                    } else {
-                        allPlatforms.push(candidate);
-                        debugHelperPlatforms.push(candidate);
-                        current = candidate;
                     }
+
+                    if (!placed) {
+                        // If we still can't place, try stepping horizontally instead
+                        const horizontalHelper = new Platform(
+                            currentCenter + toward * (BLOCK_SIZE * 2), 
+                            current.y, 
+                            BLOCK_SIZE * 2, 
+                            helperHeight, 
+                            helperColor, 
+                            'helper'
+                        );
+                        
+                        if (!overlapsAny(horizontalHelper, allPlatforms) && 
+                            horizontalHelper.x >= 0 && 
+                            horizontalHelper.x + horizontalHelper.width <= width) {
+                            allPlatforms.push(horizontalHelper);
+                            debugHelperPlatforms.push(horizontalHelper);
+                            current = horizontalHelper;
+                        } else {
+                            return;  // Give up if we can't place anything
+                        }
+                    }
+
+                    added++;
+                }
+            }
 
                     added++;
                 }
@@ -1959,9 +2024,9 @@
             // Add a ground platform at the bottom (darker and more opaque)
             platforms.push(new Platform(0, height - 20, width, 20, 'rgba(100, 60, 20, 0.8)', 'ground'));
 
-            // Add starting platform (green to indicate start)
+            // Add starting platform (green to indicate start, 5 blocks wide)
             const startPlatformY = height - 60;
-            const startPlatform = new Platform(10, startPlatformY, 100, 20, 'rgba(0, 180, 0, 0.9)', 'start');
+            const startPlatform = new Platform(10, startPlatformY, BLOCK_SIZE * 5, BLOCK_SIZE, 'rgba(0, 180, 0, 0.9)', 'start');
             platforms.push(startPlatform);
 
             // Randomly select a goal location from suitable platforms
@@ -2000,9 +2065,10 @@
                 goalX = selectedPlatform.x + selectedPlatform.width / 2 - 15;
                 goalY = selectedPlatform.y - 40; // Above the platform
                 goalSupportPlatform = new Platform(
-                    selectedPlatform.x + selectedPlatform.width / 2 - 25,
-                    selectedPlatform.y - 20,
-                    50, 20, 
+                    selectedPlatform.x + selectedPlatform.width / 2 - (BLOCK_SIZE * 1.5),
+                    selectedPlatform.y - BLOCK_SIZE,
+                    BLOCK_SIZE * 3, 
+                    BLOCK_SIZE, 
                     'rgba(255, 200, 0, 0.9)', 
                     'goal'
                 );
@@ -2010,7 +2076,7 @@
                 // Fallback to top-right if no suitable platforms found
                 goalX = width - 50;
                 goalY = 20;
-                goalSupportPlatform = new Platform(goalX - 10, goalY + 30, 50, 20, 'rgba(255, 200, 0, 0.9)', 'goal');
+                goalSupportPlatform = new Platform(goalX - 10, goalY + 30, BLOCK_SIZE * 3, BLOCK_SIZE, 'rgba(255, 200, 0, 0.9)', 'goal');
             }
             
             platforms.push(goalSupportPlatform);
