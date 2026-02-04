@@ -1997,13 +1997,20 @@
             startGame();
         }
 
+        // Fisher-Yates shuffle algorithm for unbiased array shuffling
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
         // Place letters on platforms to spell a word
         function placeLettersOnPlatforms() {
             letters = [];
             collectedLetters = [];
-            
-            // Choose a random word from the dictionary
-            targetWord = WORD_DICTIONARY[Math.floor(Math.random() * WORD_DICTIONARY.length)];
             
             // Get platforms that are suitable for letter placement
             // Exclude ground, start, and goal platforms
@@ -2016,8 +2023,21 @@
                 return;
             }
             
-            // Shuffle platforms to randomize letter placement
-            const shuffledPlatforms = [...suitablePlatforms].sort(() => Math.random() - 0.5);
+            // Choose a word that fits the available platforms
+            // Filter words that have length <= number of suitable platforms
+            const availableWords = WORD_DICTIONARY.filter(word => word.length <= suitablePlatforms.length);
+            
+            if (availableWords.length === 0) {
+                // If no words fit, use the shortest word and allow platform reuse
+                targetWord = WORD_DICTIONARY.reduce((shortest, word) => 
+                    word.length < shortest.length ? word : shortest
+                );
+            } else {
+                targetWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+            }
+            
+            // Shuffle platforms using Fisher-Yates algorithm
+            const shuffledPlatforms = shuffleArray(suitablePlatforms);
             
             // Place each letter of the word on different platforms
             for (let i = 0; i < targetWord.length; i++) {
