@@ -1020,13 +1020,13 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.width = 30;
-                this.height = 30;
+                this.width = 40;  // Wider for door appearance
+                this.height = 60; // Taller for door appearance
                 this.animation = 0;
             }
 
             update() {
-                this.animation += 0.1;
+                this.animation += 0.05;
             }
 
             checkCollision(player) {
@@ -1037,38 +1037,75 @@
             }
 
             draw() {
-                // Draw animated star/goal
-                const centerX = this.x + this.width / 2;
-                const centerY = this.y + this.height / 2;
-                const outerRadius = 15 + Math.sin(this.animation) * 2;
-                const innerRadius = 7;
-                
                 ctx.save();
-                ctx.translate(centerX, centerY);
-                ctx.rotate(this.animation * 0.5);
                 
-                // Draw star
-                ctx.beginPath();
-                for (let i = 0; i < 5; i++) {
-                    const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
-                    const radius = i % 2 === 0 ? outerRadius : innerRadius;
-                    const x = Math.cos(angle) * radius;
-                    const y = Math.sin(angle) * radius;
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.closePath();
+                // Pulsing glow effect
+                const glowIntensity = 0.7 + Math.sin(this.animation * 2) * 0.3;
                 
-                // Gradient fill
-                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, outerRadius);
-                gradient.addColorStop(0, '#FFD700');
+                // Outer glow
+                ctx.shadowColor = '#FFD700';
+                ctx.shadowBlur = 20 * glowIntensity;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+                
+                // Main door/block body with golden gradient
+                const gradient = ctx.createLinearGradient(
+                    this.x, this.y,
+                    this.x + this.width, this.y + this.height
+                );
+                gradient.addColorStop(0, '#FFE66D');
+                gradient.addColorStop(0.5, '#FFD700');
                 gradient.addColorStop(1, '#FFA500');
+                
                 ctx.fillStyle = gradient;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // Reset shadow for details
+                ctx.shadowBlur = 0;
+                
+                // Dark border
+                ctx.strokeStyle = '#8B6914';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+                
+                // Door frame detail
+                ctx.strokeStyle = '#B8860B';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(this.x + 4, this.y + 4, this.width - 8, this.height - 8);
+                
+                // Door panels
+                const panelY = this.y + 8;
+                const panelHeight = (this.height - 20) / 2;
+                
+                // Top panel
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.fillRect(this.x + 8, panelY, this.width - 16, panelHeight);
+                
+                // Bottom panel
+                ctx.fillRect(this.x + 8, panelY + panelHeight + 4, this.width - 16, panelHeight);
+                
+                // Door knob
+                const knobX = this.x + this.width - 12;
+                const knobY = this.y + this.height / 2;
+                
+                ctx.fillStyle = '#DAA520';
+                ctx.beginPath();
+                ctx.arc(knobX, knobY, 3, 0, Math.PI * 2);
                 ctx.fill();
                 
-                ctx.strokeStyle = '#FF8C00';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                // Sparkle effect
+                const sparkleCount = 3;
+                ctx.fillStyle = `rgba(255, 255, 255, ${glowIntensity})`;
+                for (let i = 0; i < sparkleCount; i++) {
+                    const angle = (this.animation * 2 + (i * Math.PI * 2 / sparkleCount));
+                    const sparkleRadius = 25;
+                    const sparkleX = this.x + this.width / 2 + Math.cos(angle) * sparkleRadius;
+                    const sparkleY = this.y + this.height / 2 + Math.sin(angle) * sparkleRadius;
+                    
+                    ctx.beginPath();
+                    ctx.arc(sparkleX, sparkleY, 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
                 
                 ctx.restore();
             }
@@ -2246,8 +2283,9 @@
                 const topCandidates = candidateGoalPlatforms.slice(0, Math.min(MAX_GOAL_CANDIDATES, candidateGoalPlatforms.length));
                 const selectedPlatform = topCandidates[Math.floor(Math.random() * topCandidates.length)];
                 
-                goalX = selectedPlatform.x + selectedPlatform.width / 2 - 15;
-                goalY = selectedPlatform.y - 40; // Above the platform
+                // Position door (40x60) centered on platform
+                goalX = selectedPlatform.x + selectedPlatform.width / 2 - 20;  // Center the 40px wide door
+                goalY = selectedPlatform.y - 60; // Door is 60px tall, place on platform
                 goalSupportPlatform = new Platform(
                     selectedPlatform.x + selectedPlatform.width / 2 - (BLOCK_SIZE * 1.5),
                     selectedPlatform.y - BLOCK_SIZE,
@@ -2258,9 +2296,9 @@
                 );
             } else {
                 // Fallback to top-right if no suitable platforms found
-                goalX = width - 50;
-                goalY = 20;
-                goalSupportPlatform = new Platform(goalX - 10, goalY + 30, BLOCK_SIZE * 3, BLOCK_SIZE, 'rgba(255, 200, 0, 0.9)', 'goal');
+                goalX = width - 60;  // Adjusted for 40px wide door
+                goalY = 30;  // Adjusted for 60px tall door
+                goalSupportPlatform = new Platform(goalX, goalY + 60, BLOCK_SIZE * 3, BLOCK_SIZE, 'rgba(255, 200, 0, 0.9)', 'goal');
             }
             
             platforms.push(goalSupportPlatform);
