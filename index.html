@@ -698,7 +698,7 @@
 
         // Game configuration constants
         const PLAYER_SIZE = 20;  // Matches BLOCK_SIZE exactly
-        const PLAYER_SPEED = 4;  // Adjusted from 3 - sweet spot between 3 and 5
+        const PLAYER_SPEED = 3;  // Reduced from 4 for more precise positioning in tight gaps
         const PLAYER_JUMP_POWER = 14;  // Increased from 12 - allows jumping up one additional block
         const PLAYER_GRAVITY = 0.5;
 
@@ -2300,9 +2300,13 @@
                 const selectedPlatform = topCandidates[Math.floor(Math.random() * topCandidates.length)];
                 
                 // Create goal support platform
+                // Ensure platform is low enough that portal above it will be visible
+                const minPlatformY = WORD_BAR_AREA_HEIGHT + (BLOCK_SIZE * 2) + 10;  // Room for portal above
+                const platformY = Math.max(minPlatformY, selectedPlatform.y - BLOCK_SIZE);
+                
                 goalPlatform = new Platform(
                     selectedPlatform.x + selectedPlatform.width / 2 - (BLOCK_SIZE * 1.5),
-                    selectedPlatform.y - BLOCK_SIZE,
+                    platformY,
                     BLOCK_SIZE * 3, 
                     BLOCK_SIZE, 
                     'rgba(255, 200, 0, 0.9)', 
@@ -2311,15 +2315,15 @@
             } else {
                 // Fallback to safe position if no suitable platforms found
                 const goalX = width - (BLOCK_SIZE * 4);  // Ensure it's not too close to edge
-                const goalY = Math.max(WORD_BAR_AREA_HEIGHT + (BLOCK_SIZE * 3), 100);  // Ensure portal will be visible
+                const goalY = WORD_BAR_AREA_HEIGHT + (BLOCK_SIZE * 2) + 20;  // Low enough for portal to be above
                 goalPlatform = new Platform(goalX, goalY, BLOCK_SIZE * 3, BLOCK_SIZE, 'rgba(255, 200, 0, 0.9)', 'goal');
             }
             
             platforms.push(goalPlatform);
             
-            // Create portal on top of goal platform - ensure it's visible on screen
+            // Create portal on top of goal platform
             const portalX = goalPlatform.x + (goalPlatform.width / 2) - (BLOCK_SIZE / 2);  // Center on platform
-            const portalY = Math.max(WORD_BAR_AREA_HEIGHT + 10, goalPlatform.y - (BLOCK_SIZE * 2));  // Ensure portal is below word bar
+            const portalY = goalPlatform.y - (BLOCK_SIZE * 2);  // Portal sits on top of platform
             
             goal = new Goal(portalX, portalY);
             
