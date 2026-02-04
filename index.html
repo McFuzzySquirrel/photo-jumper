@@ -657,6 +657,7 @@
         const START_AREA_HEIGHT = 100;  // Taller to ensure clear start area
         const GOAL_AREA_WIDTH = 100;
         const GOAL_AREA_HEIGHT = 80;
+        const WORD_BAR_AREA_HEIGHT = 60;  // Reserved area at top for word collection UI
         
         // Stuck detection constants
         // Increased to avoid false positives during normal stationary gameplay (planning, waiting)
@@ -722,7 +723,7 @@
             'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js',  // CDN (preferred for production)
             'lib/ort.min.js',  // Local fallback (for development/offline)
         ];
-        const ML_CONFIDENCE_THRESHOLD = 0.5;
+        const ML_CONFIDENCE_THRESHOLD = 0.3;  // Lowered from 0.5 to detect more objects
         const ML_INPUT_SIZE = 640;  // YOLOv8n expects 640x640 input images
         const ML_INFERENCE_TIMEOUT_MS = 5000;
         const ML_MIN_DETECTION_SIZE = 10;  // Minimum bounding box size in pixels to consider
@@ -1474,7 +1475,8 @@
                 // Skip if platform would be in reserved areas
                 const isStartArea = (platformX < START_AREA_WIDTH && platformY > canvasHeight - START_AREA_HEIGHT);
                 const isGoalArea = (platformX > canvasWidth - GOAL_AREA_WIDTH && platformY < GOAL_AREA_HEIGHT);
-                if (isStartArea || isGoalArea) continue;
+                const isWordBarArea = (platformY < WORD_BAR_AREA_HEIGHT);
+                if (isStartArea || isGoalArea || isWordBarArea) continue;
                 
                 // Skip if platform is too small
                 if (platformWidth < PLATFORM_MIN_WIDTH) continue;
@@ -1731,11 +1733,12 @@
                         // Create solid hint if brightness is below threshold OR at edges (better object detection)
                         const isEdge = hasEdge(x, y, width, height, data);
 
-                        // Reserve start area (bottom-left) and goal area (top-right) - don't generate photo platforms there
+                        // Reserve start area (bottom-left), goal area (top-right), and word bar area (top) - don't generate photo platforms there
                         const isStartArea = (x < START_AREA_WIDTH && y > height - START_AREA_HEIGHT);
                         const isGoalArea = (x > width - GOAL_AREA_WIDTH && y < GOAL_AREA_HEIGHT);
+                        const isWordBarArea = (y < WORD_BAR_AREA_HEIGHT);
 
-                        const isSolidHint = (!isStartArea && !isGoalArea) &&
+                        const isSolidHint = (!isStartArea && !isGoalArea && !isWordBarArea) &&
                             (avgBrightness < brightnessThreshold || (isEdge && avgBrightness < EDGE_BRIGHTNESS_THRESHOLD));
 
                         solid[cy][cx] = Boolean(isSolidHint);
@@ -1833,7 +1836,7 @@
                     const stepX = limits.maxJumpDx * 0.7;
                     const stepUp = limits.maxJumpUp * 0.7;
 
-                    const targetY = Math.max(10, current.y - stepUp);
+                    const targetY = Math.max(WORD_BAR_AREA_HEIGHT, current.y - stepUp);
                     const idealX = currentCenter + toward * stepX - (helperWidth / 2);
                     let targetX = Math.max(0, Math.min(width - helperWidth, idealX));
 
@@ -2098,8 +2101,16 @@
             const availableWords = WORD_DICTIONARY.filter(word => word.length <= suitablePlatforms.length);
             
             if (availableWords.length === 0) {
-                // If no words fit, use the pre-computed shortest word
-                targetWord = SHORTEST_WORD;
+                // If no words fit (not enough reachable platforms), truncate the shortest word
+                // to match the number of available platforms
+                const baseWord = SHORTEST_WORD;
+                targetWord = baseWord.substring(0, Math.min(baseWord.length, suitablePlatforms.length));
+                
+                // If still no platforms, exit early
+                if (suitablePlatforms.length === 0 || targetWord.length === 0) {
+                    console.warn('Not enough reachable platforms for any word');
+                    return;
+                }
             } else {
                 targetWord = availableWords[Math.floor(Math.random() * availableWords.length)];
             }
@@ -2110,6 +2121,15 @@
             // Place each letter of the word on different platforms (one letter per platform)
             for (let i = 0; i < targetWord.length; i++) {
                 const platform = shuffledPlatforms[i];  // Direct indexing since word length <= platform count
+                
+                // Safety check: ensure platform exists
+                // This should never happen due to filtering above, but we check defensively
+                // to prevent crashes from undefined access
+                if (!platform) {
+                    console.error(`CRITICAL: Platform ${i} is undefined for letter ${targetWord[i]} - this indicates a bug in platform filtering`);
+                    console.error(`Available platforms: ${suitablePlatforms.length}, Word length: ${targetWord.length}`);
+                    continue;
+                }
                 
                 // Place letter on top of platform, centered with some randomness
                 const platformCenterX = platform.x + platform.width / 2;
