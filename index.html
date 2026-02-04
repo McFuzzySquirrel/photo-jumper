@@ -659,7 +659,7 @@
         const GOAL_AREA_HEIGHT = 80;
         
         // Stuck detection constants
-        const STUCK_CHECK_INTERVAL = 3000;  // 3 seconds
+        const STUCK_CHECK_INTERVAL = 5000;  // 5 seconds (increased to avoid false positives during letter collection)
         const STUCK_MOVEMENT_THRESHOLD = 5;  // pixels
 
         // Letter collection constants
@@ -802,8 +802,10 @@
                 // Horizontal movement
                 if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
                     this.velocityX = -this.speed;
+                    this.lastPositionTime = Date.now(); // Reset stuck timer on input
                 } else if (keys['ArrowRight'] || keys['d'] || keys['D']) {
                     this.velocityX = this.speed;
+                    this.lastPositionTime = Date.now(); // Reset stuck timer on input
                 } else {
                     this.velocityX *= 0.7; // Reduced friction for more responsive feel
                 }
@@ -813,6 +815,7 @@
                     this.velocityY = -this.jumpPower;
                     this.onGround = false;
                     touchJumping = false; // Reset touch jump
+                    this.lastPositionTime = Date.now(); // Reset stuck timer on input
                 }
 
                 // Apply gravity
@@ -2000,8 +2003,8 @@
             const limits = getJumpLimits();
             addHelperPlatformsIfNeeded(startPlatform, goalSupportPlatform, platforms, limits);
 
-            // Place collectible letters on platforms
-            placeLettersOnPlatforms();
+            // Place collectible letters on platforms (pass limits and startPlatform for reachability check)
+            placeLettersOnPlatforms(startPlatform, limits);
 
             // Start game
             startGame();
@@ -2018,18 +2021,28 @@
         }
 
         // Place letters on platforms to spell a word
-        function placeLettersOnPlatforms() {
+        function placeLettersOnPlatforms(startPlatform, limits) {
             letters = [];
             collectedLetters = [];
             
-            // Get platforms that are suitable for letter placement
+            // Get platforms that are suitable for letter placement AND reachable from start
             // Exclude ground, start, and goal platforms
-            const suitablePlatforms = platforms.filter(p => 
-                p.kind === 'photo' || p.kind === 'ml' || p.kind === 'helper'
-            );
+            const suitablePlatforms = platforms.filter(p => {
+                // Must be a photo/ml/helper platform
+                if (p.kind !== 'photo' && p.kind !== 'ml' && p.kind !== 'helper') {
+                    return false;
+                }
+                
+                // Must be reachable from the start platform
+                if (!canReachPlatform(startPlatform, p, limits)) {
+                    return false;
+                }
+                
+                return true;
+            });
             
             if (suitablePlatforms.length === 0) {
-                console.warn('No suitable platforms for letter placement');
+                console.warn('No suitable reachable platforms for letter placement');
                 return;
             }
             
@@ -2063,7 +2076,7 @@
                 letters.push(new Letter(targetWord[i], letterX, letterY, i));
             }
             
-            console.log(`Placed ${letters.length} letters to spell: ${targetWord}`);
+            console.log(`Placed ${letters.length} letters to spell: ${targetWord} on reachable platforms`);
         }
 
         // Start the game loop
