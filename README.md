@@ -36,25 +36,31 @@ A web-based platform jumping game that converts your photos into playable levels
 ## Features
 
 - 📸 **Photo Upload**: Upload a photo from your device or take one with your camera
-- 🎨 **Dynamic Level Generation**: Photos are automatically converted into platforms based on brightness
-- 🤖 **ML Object Detection (Experimental)**: Optional ONNX-based detection that creates platforms from 51 object types including furniture, vehicles, electronics, animals, and people!
-- 🖼️ **Photo Background**: Your photo is displayed as the game background, making you feel like you're playing inside the picture
+- 🎨 **Dynamic Level Generation**: Photos are automatically converted into block-based platforms
+- 🧱 **Retro Block Aesthetic**: 16-bit Mario-style modular block platforms with clear collision boundaries
+- 🤖 **ML Object Detection (Experimental)**: Optional ONNX-based detection for 51 object types
+- 🖼️ **Photo Background**: Your photo displays as the game background with zoom and camera following
 - 🎮 **Classic Platform Gameplay**: Jump and navigate through your photo-based levels
+- 🔤 **Letter Collection**: Collect letters to spell words for bonus points
+- 🚪 **Goal Portal**: Walk into the glowing golden portal to complete the level
 - 🕹️ **Multiple Control Options**:
-  - Keyboard: Arrow Keys or WASD to move, Space/Up Arrow to jump
+  - Keyboard: Arrow Keys or WASD to move, Space/Up/W to jump
   - Touch: Touch controls for mobile devices
-- 📊 **Score Tracking**: Track your score and time as you play
+  - Zoom: +/- keys or mouse wheel, on-screen buttons in fullscreen
+  - Special: R to respawn, G to regenerate level
+- 🔄 **Level Regeneration**: Press G to regenerate platforms if you get stuck
+- 📊 **Score Tracking**: Points for height progress, letter collection, word completion, and correct order
 - 📱 **Responsive Design**: Works on desktop and mobile devices
-- 📲 **Installable PWA**: Install as a standalone app on desktop or mobile
+- 📲 **Installable PWA**: Install as a standalone app
 - 🔌 **Offline Support**: Play without internet after first visit
 
 ## How to Play
 
 1. Open `index.html` in your web browser
 2. Click "Upload Photo" to select an image from your device, or "Take Photo" to use your camera
-3. The photo will be converted into a platform level:
-   - **Default**: Grid-based detection (darker areas become platforms)
-   - **ML Detection (Optional)**: Enable the checkbox to detect 51 object types including:
+3. The photo will be converted into a playable level:
+   - **Grid-Based**: Brightness detection creates platforms from darker areas
+   - **ML Detection (Optional)**: Checkbox to detect 51 object types as platforms:
      - Furniture (chairs, tables, couches, beds)
      - Vehicles (cars, buses, trains, airplanes, bicycles)
      - Electronics (laptops, TVs, keyboards, microwaves)
@@ -62,12 +68,16 @@ A web-based platform jumping game that converts your photos into playable levels
      - People (jump on heads Mario-style!)
      - Sports equipment (skateboards, surfboards, snowboards)
      - And more!
-4. Use the controls to navigate:
-   - **Move**: Arrow Keys or WASD
-   - **Jump**: Space or Up Arrow
-   - **Mobile**: Touch controls
-5. Try to navigate through the level without falling!
-6. Click "New Photo" to load a different image
+4. Navigate through the level:
+   - **Move**: Arrow Keys, WASD, or touch controls
+   - **Jump**: Space, Up Arrow, W, or jump button
+   - **Zoom**: +/- keys, mouse wheel, or on-screen buttons (fullscreen)
+   - **Camera**: Automatically follows player
+5. **Collect letters** to spell words for bonus points
+6. **Walk into the golden portal** to complete the level
+7. **Press G** to regenerate platforms if stuck
+8. **Press R** to respawn at start position
+9. Click "← Exit" to return to photo selection
 
 **Tip**: Try photos of your pets, living room, parking lot, or zoo for best ML results!
 
