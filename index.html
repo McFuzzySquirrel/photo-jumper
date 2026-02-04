@@ -2488,8 +2488,8 @@
             camera.targetX = 0;
             camera.targetY = 0;
             
-            // Resize canvas to fill viewport
-            resizeCanvas();
+            // Note: Canvas dimensions are set in processImage() based on image aspect ratio
+            // Don't call resizeCanvas() here as it would override those dimensions
             
             // Enter fullscreen when game starts
             enterFullscreen();
@@ -3257,7 +3257,13 @@
             // Regenerate level with 'G' key
             if ((e.key === 'g' || e.key === 'G') && backgroundImage && gameRunning) {
                 console.log('Regenerating level...');
-                processImage(backgroundImage);
+                gameRunning = false;  // Stop current game loop
+                
+                // Small delay to ensure current frame completes
+                setTimeout(() => {
+                    processImage(backgroundImage);
+                }, 50);
+                
                 e.preventDefault();
                 return;
             }
