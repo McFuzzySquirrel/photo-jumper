@@ -691,7 +691,6 @@
         // Letter collection game state
         let letters = [];  // Array of Letter objects
         let collectedLetters = [];  // Array of collected letters in order
-        let collectedIndices = new Set();  // Set of collected letter indices for fast lookup
         let targetWord = '';  // The word to spell
         let wordCompleteBonus = 0;  // Bonus earned for completing word
         let correctOrderBonus = 0;  // Bonus earned for correct order
@@ -2017,7 +2016,6 @@
         function placeLettersOnPlatforms() {
             letters = [];
             collectedLetters = [];
-            collectedIndices.clear();
             
             // Get platforms that are suitable for letter placement
             // Exclude ground, start, and goal platforms
@@ -2044,9 +2042,9 @@
             // Shuffle platforms using Fisher-Yates algorithm
             const shuffledPlatforms = shuffleArray(suitablePlatforms);
             
-            // Place each letter of the word on different platforms
+            // Place each letter of the word on different platforms (one letter per platform)
             for (let i = 0; i < targetWord.length; i++) {
-                const platform = shuffledPlatforms[i % shuffledPlatforms.length];
+                const platform = shuffledPlatforms[i];  // Direct indexing since word length <= platform count
                 
                 // Place letter on top of platform, centered with some randomness
                 const platformCenterX = platform.x + platform.width / 2;
@@ -2126,7 +2124,6 @@
                     if (letter.checkCollision(player)) {
                         letter.collected = true;
                         collectedLetters.push(letter);
-                        collectedIndices.add(letter.index);
                         
                         // Add points for the letter
                         score += LETTER_POINTS;
@@ -2267,11 +2264,14 @@
             ctx.font = 'bold 18px Arial';
             ctx.textAlign = 'center';
             
+            // Create a Set of collected indices for O(1) lookup during rendering
+            const collectedIndices = new Set(collectedLetters.map(l => l.index));
+            
             for (let i = 0; i < targetWord.length; i++) {
                 const x = startX + i * letterSpacing;
                 const y = panelY + panelHeight / 2;
                 
-                // Check if this letter has been collected using the maintained Set
+                // Check if this letter has been collected
                 const collected = collectedIndices.has(i);
                 
                 // Draw letter circle
@@ -2389,7 +2389,6 @@
             score = 0;
             letters = [];  // Clear letters
             collectedLetters = [];  // Clear collected letters
-            collectedIndices.clear();  // Clear collected indices Set
             targetWord = '';  // Clear target word
             wordCompleteBonus = 0;
             correctOrderBonus = 0;
