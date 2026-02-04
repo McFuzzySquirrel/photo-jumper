@@ -646,7 +646,7 @@
         const PLATFORM_MIN_WIDTH = 40;
         const PLATFORM_THICKNESS = 14;
         const PLATFORM_MERGE_GAP_PX = 0;
-        const HELPERS_MAX_COUNT = 14;
+        const HELPERS_MAX_COUNT = 20;  // Increased from 14 for better reachability
 
         const DEBUG_DEFAULT_ENABLED = false;
         
@@ -1484,16 +1484,15 @@
                 // Skip if platform is outside canvas bounds
                 if (platformY < 0 || platformY > canvasHeight - PLATFORM_THICKNESS) continue;
                 
-                // Assign color based on detection confidence and whether it's a "platformable" object
+                // All detected objects become solid semi-opaque platforms for smooth gameplay
+                // Use consistent alpha for clear visual feedback (85% opacity)
                 let color;
                 if (detection.isPlatformable) {
                     // Green-tinted for explicitly platformable objects
-                    const alpha = 0.75 + (detection.confidence * 0.2);
-                    color = `rgba(60, 150, 80, ${alpha})`;
+                    color = 'rgba(60, 150, 80, 0.85)';
                 } else {
                     // Blue-tinted for other detected objects
-                    const alpha = 0.65 + (detection.confidence * 0.2);
-                    color = `rgba(80, 100, 160, ${alpha})`;
+                    color = 'rgba(80, 100, 160, 0.85)';
                 }
                 
                 platformCandidates.push({
@@ -1563,9 +1562,10 @@
             const maxJumpDx = speed * maxHangTime;
 
             // Conservative safety margins (gameplay-first): if we say reachable, it should be reachable.
+            // Increased margins to be more generous and ensure better level traversability
             return {
-                maxJumpUp: maxJumpUp * 0.9,
-                maxJumpDx: maxJumpDx * 0.85,
+                maxJumpUp: maxJumpUp * 0.95,  // Increased from 0.9 for more vertical reach
+                maxJumpDx: maxJumpDx * 0.90,  // Increased from 0.85 for more horizontal reach
                 jumpPower,
                 gravity,
                 speed
@@ -1749,7 +1749,8 @@
             }
 
             function platformColorFromBrightness(avgBrightness) {
-                const alpha = 0.68;
+                // Solid semi-opaque blocks for clear gameplay experience
+                const alpha = 0.85;
                 const colorValue = Math.floor(avgBrightness * 0.6);
                 return `rgba(${colorValue}, ${colorValue}, ${colorValue}, ${alpha})`;
             }
@@ -1833,8 +1834,8 @@
                     const goalCenter = goalSupportPlatform.x + goalSupportPlatform.width / 2;
 
                     const toward = Math.sign(goalCenter - currentCenter) || 1;
-                    const stepX = limits.maxJumpDx * 0.7;
-                    const stepUp = limits.maxJumpUp * 0.7;
+                    const stepX = limits.maxJumpDx * 0.8;  // Increased from 0.7 for bigger jumps
+                    const stepUp = limits.maxJumpUp * 0.8; // Increased from 0.7 for bigger vertical steps
 
                     const targetY = Math.max(WORD_BAR_AREA_HEIGHT, current.y - stepUp);
                     const idealX = currentCenter + toward * stepX - (helperWidth / 2);
@@ -1911,10 +1912,10 @@
                         ).join(', '));
                     }
                     
-                    const platformableDetections = detections.filter(d => d.isPlatformable);
-                    console.log(`${platformableDetections.length} of those are platformable`);
                     
-                    if (platformableDetections.length > 0) {
+                    // Convert ALL detected objects to platforms for smooth gameplay
+                    // This ensures maximum platform coverage and better level traversability
+                    if (detections.length > 0) {
                         mlPlatforms = mapObjectsToPlatforms(detections, width, height);
                         
                         // Convert ML platform candidates to Platform objects
@@ -1922,10 +1923,9 @@
                             new Platform(p.x, p.y, p.width, p.height, p.color, 'ml')
                         );
                         
-                        updateMLStatus(`${platformableDetections.length} objects → platforms`);
-                    } else if (detections.length > 0) {
-                        console.log('ℹ️ Objects detected but none are platformable. Enable debug overlay to see them.');
-                        updateMLStatus(`${detections.length} objects (none platformable)`);
+                        // Count platformable detections for status display
+                        const platformableCount = detections.filter(d => d.isPlatformable).length;
+                        updateMLStatus(`${detections.length} objects → platforms (${platformableCount} platformable)`);
                     } else {
                         console.log('ℹ️ No objects detected. Try photos with furniture, vehicles, or electronics.');
                         console.log('   Platformable objects: chairs, tables, couches, cars, laptops, etc.');
