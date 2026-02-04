@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head><title>Create Test Image</title></head>
+<body>
+<canvas id="c" width="800" height="600"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// Sky blue background
+ctx.fillStyle = '#87CEEB';
+ctx.fillRect(0, 0, 800, 600);
+
+// Draw platforms as dark brown rectangles
+ctx.fillStyle = '#654321';
+
+// Bottom platforms
+ctx.fillRect(50, 550, 150, 30);
+ctx.fillRect(300, 550, 150, 30);
+ctx.fillRect(550, 550, 150, 30);
+
+// Mid-level platforms
+ctx.fillRect(100, 450, 120, 30);
+ctx.fillRect(350, 420, 130, 30);
+ctx.fillRect(600, 440, 110, 30);
+
+// Upper-mid platforms
+ctx.fillRect(80, 320, 140, 30);
+ctx.fillRect(300, 300, 120, 30);
+ctx.fillRect(520, 330, 130, 30);
+
+// High platforms
+ctx.fillRect(150, 200, 120, 30);
+ctx.fillRect(400, 180, 110, 30);
+ctx.fillRect(600, 210, 100, 30);
+
+// Very high platforms
+ctx.fillRect(200, 100, 100, 30);
+ctx.fillRect(450, 80, 110, 30);
+ctx.fillRect(650, 120, 90, 30);
+
+// Convert to data URL and trigger download
+canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'test-platforms.png';
+    a.click();
+    document.body.innerHTML = '<h1>Image created! Check your downloads.</h1>';
+});
+</script>
+</body>
+</html>

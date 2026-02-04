@@ -1542,6 +1542,90 @@
         // End ONNX ML Detection Functions
         // ==========================================
 
+        // Helper functions for reachability checking
+        function intervalGap(a1, a2, b1, b2) {
+            if (a2 < b1) return b1 - a2;
+            if (b2 < a1) return a1 - b2;
+            return 0;
+        }
+
+        function getJumpLimits() {
+            const jumpPower = PLAYER_JUMP_POWER;
+            const gravity = PLAYER_GRAVITY;
+            const speed = PLAYER_SPEED;
+
+            const maxJumpUp = (jumpPower * jumpPower) / (2 * gravity);
+            const maxHangTime = (2 * jumpPower) / gravity;
+            const maxJumpDx = speed * maxHangTime;
+
+            // Conservative safety margins (gameplay-first): if we say reachable, it should be reachable.
+            return {
+                maxJumpUp: maxJumpUp * 0.9,
+                maxJumpDx: maxJumpDx * 0.85,
+                jumpPower,
+                gravity,
+                speed
+            };
+        }
+
+        function canReachPlatform(from, to, limits) {
+            if (from === to) return false;
+
+            const fromLeft = from.x;
+            const fromRight = from.x + from.width;
+            const toLeft = to.x;
+            const toRight = to.x + to.width;
+
+            const dx = intervalGap(fromLeft, fromRight, toLeft, toRight);
+            if (dx > limits.maxJumpDx) return false;
+
+            const up = from.y - to.y;
+            if (up <= 0) {
+                // Dropping down is allowed; keep conservative horizontal requirement only.
+                return true;
+            }
+
+            if (up > limits.maxJumpUp) return false;
+
+            // More accurate horizontal limit for higher targets: time to reach that height (descending).
+            const disc = (limits.jumpPower * limits.jumpPower) - (2 * limits.gravity * up);
+            if (disc < 0) return false;
+            const tLanding = (limits.jumpPower + Math.sqrt(disc)) / limits.gravity;
+            const dxLimit = Math.min(limits.maxJumpDx, limits.speed * tLanding * 0.9);
+            return dx <= dxLimit;
+        }
+
+        function isReachable(startPlatform, goalPlatform, allPlatforms, limits) {
+            const visited = new Set();
+            const queue = [startPlatform];
+            visited.add(startPlatform);
+
+            while (queue.length) {
+                const current = queue.shift();
+                if (current === goalPlatform) return true;
+
+                for (const next of allPlatforms) {
+                    if (visited.has(next)) continue;
+                    if (!canReachPlatform(current, next, limits)) continue;
+                    visited.add(next);
+                    queue.push(next);
+                }
+            }
+
+            return false;
+        }
+
+        function overlapsAny(candidate, allPlatforms) {
+            for (const p of allPlatforms) {
+                const overlaps = !(candidate.x + candidate.width <= p.x ||
+                    candidate.x >= p.x + p.width ||
+                    candidate.y + candidate.height <= p.y ||
+                    candidate.y >= p.y + p.height);
+                if (overlaps) return true;
+            }
+            return false;
+        }
+
         // Process image and create platforms
         async function processImage(image) {
             // Store the image for background rendering
@@ -1724,89 +1808,6 @@
                 }
 
                 return platformsOut;
-            }
-
-            function intervalGap(a1, a2, b1, b2) {
-                if (a2 < b1) return b1 - a2;
-                if (b2 < a1) return a1 - b2;
-                return 0;
-            }
-
-            function getJumpLimits() {
-                const jumpPower = PLAYER_JUMP_POWER;
-                const gravity = PLAYER_GRAVITY;
-                const speed = PLAYER_SPEED;
-
-                const maxJumpUp = (jumpPower * jumpPower) / (2 * gravity);
-                const maxHangTime = (2 * jumpPower) / gravity;
-                const maxJumpDx = speed * maxHangTime;
-
-                // Conservative safety margins (gameplay-first): if we say reachable, it should be reachable.
-                return {
-                    maxJumpUp: maxJumpUp * 0.9,
-                    maxJumpDx: maxJumpDx * 0.85,
-                    jumpPower,
-                    gravity,
-                    speed
-                };
-            }
-
-            function canReachPlatform(from, to, limits) {
-                if (from === to) return false;
-
-                const fromLeft = from.x;
-                const fromRight = from.x + from.width;
-                const toLeft = to.x;
-                const toRight = to.x + to.width;
-
-                const dx = intervalGap(fromLeft, fromRight, toLeft, toRight);
-                if (dx > limits.maxJumpDx) return false;
-
-                const up = from.y - to.y;
-                if (up <= 0) {
-                    // Dropping down is allowed; keep conservative horizontal requirement only.
-                    return true;
-                }
-
-                if (up > limits.maxJumpUp) return false;
-
-                // More accurate horizontal limit for higher targets: time to reach that height (descending).
-                const disc = (limits.jumpPower * limits.jumpPower) - (2 * limits.gravity * up);
-                if (disc < 0) return false;
-                const tLanding = (limits.jumpPower + Math.sqrt(disc)) / limits.gravity;
-                const dxLimit = Math.min(limits.maxJumpDx, limits.speed * tLanding * 0.9);
-                return dx <= dxLimit;
-            }
-
-            function isReachable(startPlatform, goalPlatform, allPlatforms, limits) {
-                const visited = new Set();
-                const queue = [startPlatform];
-                visited.add(startPlatform);
-
-                while (queue.length) {
-                    const current = queue.shift();
-                    if (current === goalPlatform) return true;
-
-                    for (const next of allPlatforms) {
-                        if (visited.has(next)) continue;
-                        if (!canReachPlatform(current, next, limits)) continue;
-                        visited.add(next);
-                        queue.push(next);
-                    }
-                }
-
-                return false;
-            }
-
-            function overlapsAny(candidate, allPlatforms) {
-                for (const p of allPlatforms) {
-                    const overlaps = !(candidate.x + candidate.width <= p.x ||
-                        candidate.x >= p.x + p.width ||
-                        candidate.y + candidate.height <= p.y ||
-                        candidate.y >= p.y + p.height);
-                    if (overlaps) return true;
-                }
-                return false;
             }
 
             function addHelperPlatformsIfNeeded(startPlatform, goalSupportPlatform, allPlatforms, limits) {
