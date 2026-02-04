@@ -307,6 +307,49 @@
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         }
 
+        /* Zoom control buttons */
+        .zoom-controls {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 102;
+        }
+
+        .game-canvas-container.fullscreen ~ .zoom-controls {
+            display: flex;
+        }
+
+        .zoom-btn {
+            width: 50px;
+            height: 50px;
+            font-size: 24px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+        }
+
+        .zoom-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #FFD700;
+            transform: scale(1.1);
+        }
+
+        .zoom-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.95);
+        }
+
         /* Intro screen styles */
         .intro-screen {
             text-align: center;
@@ -374,18 +417,21 @@
             position: fixed;
             inset: 0;
             z-index: 100;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #000;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 10px;
+            padding: 0;
+            margin: 0;
         }
 
         .game-canvas-container.fullscreen #gameCanvas {
-            max-width: 95vw;
-            max-height: 95vh;
-            border-radius: 10px;
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
+            border-radius: 0;
         }
 
         /* Hide non-essential elements when canvas is fullscreen */
@@ -427,19 +473,26 @@
         /* Exit fullscreen button */
         .exit-fullscreen-btn {
             position: fixed;
-            top: 10px;
+            top: 60px;  /* Moved down to not overlap score */
             right: 10px;
             z-index: 101;
             background: rgba(0, 0, 0, 0.7);
             color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
             display: none;
+            cursor: pointer;
         }
 
         .exit-fullscreen-btn.visible {
             display: block;
+        }
+        
+        .exit-fullscreen-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #FFD700;
         }
 
         @media (max-width: 600px) {
@@ -467,7 +520,7 @@
     </style>
 </head>
 <body>
-    <button class="exit-fullscreen-btn" id="exitFullscreenBtn">✕ Exit Game</button>
+    <button class="exit-fullscreen-btn" id="exitFullscreenBtn">← Exit</button>
     
     <div class="container">
         <!-- Intro Screen -->
@@ -536,18 +589,29 @@
             <button class="control-btn" id="rightBtn" aria-label="Move right">▶</button>
         </div>
 
+        <!-- Zoom control buttons -->
+        <div class="zoom-controls" id="zoomControls">
+            <button class="zoom-btn" id="zoomOutBtn" aria-label="Zoom out" title="Zoom out (-)">−</button>
+            <button class="zoom-btn" id="zoomResetBtn" aria-label="Reset zoom" title="Reset zoom (0)">⊙</button>
+            <button class="zoom-btn" id="zoomInBtn" aria-label="Zoom in" title="Zoom in (+)">+</button>
+        </div>
+
         <div class="instructions">
             <h3>How to Play:</h3>
             <p>1. Upload a photo or take one with your camera</p>
-            <p>2. The photo will be converted into platforms based on brightness</p>
+            <p>2. The photo will be converted into block platforms</p>
             <p>3. Use <strong>Arrow Keys</strong> or <strong>WASD</strong> to move (or touch controls on mobile)</p>
-            <p>4. Press <strong>Space</strong> or <strong>Up Arrow</strong> to jump</p>
-            <p>5. Navigate from the green start platform to the golden goal star!</p>
-            <p>6. Press <strong>R</strong> to respawn if you get stuck</p>
-            <p><label><input type="checkbox" id="debugOverlayToggle"> Debug overlay</label></p>
+            <p>4. Press <strong>Space</strong>, <strong>Up</strong>, or <strong>W</strong> to jump</p>
+            <p>5. Collect golden letters to spell words for bonus points</p>
+            <p>6. Walk into the glowing <strong>golden portal</strong> to win!</p>
+            <p>7. Press <strong>R</strong> to respawn, <strong>G</strong> to regenerate level</p>
+            <p><label><input type="checkbox" id="debugOverlayToggle"> Debug overlay (shows platform grid)</label></p>
             <p><label><input type="checkbox" id="mlDetectionToggle" aria-describedby="mlStatusDesc"> ML object detection (experimental)</label>
                 <span id="mlStatus" style="font-size: 12px; color: #666;"></span>
                 <span id="mlStatusDesc" class="visually-hidden" style="position: absolute; left: -10000px;">When enabled, uses machine learning to detect objects in your photo and create platforms from them. May increase loading time.</span>
+            </p>
+            <p style="font-size: 12px; color: #666; margin-top: 15px;">
+                🔒 <strong>Privacy:</strong> All photos are processed entirely in your browser. No images are uploaded, stored, or transmitted to any server.
             </p>
         </div>
         </div>
@@ -628,12 +692,18 @@
         const rightBtn = document.getElementById('rightBtn');
         const jumpBtn = document.getElementById('jumpBtn');
 
+        // Zoom control buttons
+        const zoomControls = document.getElementById('zoomControls');
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const zoomResetBtn = document.getElementById('zoomResetBtn');
+
         const FEEDBACK_TOKEN_STORAGE_KEY = 'photoJumperFeedbackToken';
 
         // Game configuration constants
-        const PLAYER_SIZE = 20;
-        const PLAYER_SPEED = 5;
-        const PLAYER_JUMP_POWER = 12;
+        const PLAYER_SIZE = 20;  // Matches BLOCK_SIZE exactly
+        const PLAYER_SPEED = 3;  // Reduced from 4 for more precise positioning in tight gaps
+        const PLAYER_JUMP_POWER = 14;  // Increased from 12 - allows jumping up one additional block
         const PLAYER_GRAVITY = 0.5;
 
         const GRID_SIZE = 20;  // Reduced from 30 to detect more platforms (1x player size)
@@ -642,11 +712,12 @@
         const EDGE_DETECTION_THRESHOLD = 30;  // Reduced from 40 for better edge detection
         const EDGE_BRIGHTNESS_THRESHOLD = 200;  // Increased from 180 to accept more edge-detected platforms
 
-        // Gameplay-first platform constraints
-        const PLATFORM_MIN_WIDTH = 40;
-        const PLATFORM_THICKNESS = 14;
+        // Modular block platform system
+        const BLOCK_SIZE = 20;  // Individual block size (matches GRID_SIZE and PLAYER_SIZE)
+        const PLATFORM_MIN_WIDTH = 40;  // Must fit at least 2 blocks
+        const PLATFORM_THICKNESS = BLOCK_SIZE;  // One block tall
         const PLATFORM_MERGE_GAP_PX = 0;
-        const HELPERS_MAX_COUNT = 20;  // Increased from 14 for better reachability
+        const HELPERS_MAX_COUNT = 50;  // Increased from 30 - more helpers for complex photos
 
         const DEBUG_DEFAULT_ENABLED = false;
         
@@ -657,11 +728,10 @@
         const START_AREA_HEIGHT = 100;  // Taller to ensure clear start area
         const GOAL_AREA_WIDTH = 100;
         const GOAL_AREA_HEIGHT = 80;
-        const WORD_BAR_AREA_HEIGHT = 60;  // Reserved area at top for word collection UI
+        const WORD_BAR_AREA_HEIGHT = 30;  // Reduced from 60 to not overlap with score display
         
         // Stuck detection constants
-        // Increased to avoid false positives during normal stationary gameplay (planning, waiting)
-        const STUCK_CHECK_INTERVAL = 5000;  // 5 seconds
+        const STUCK_CHECK_INTERVAL = 15000;  // 15 seconds - increased from 5 for more patience
         const STUCK_MOVEMENT_THRESHOLD = 5;  // pixels
 
         // Letter collection constants
@@ -676,6 +746,18 @@
         const WORD_DICTIONARY = ['JUMP', 'PLAY', 'GAME', 'PHOTO', 'STAR', 'GOAL', 'WIN', 'FUN'];
         const MAX_GOAL_CANDIDATES = 3;  // Number of top goal platform candidates to randomly select from
         
+        // Camera and viewport constants
+        let camera = {
+            x: 0,
+            y: 0,
+            zoom: 1.0,
+            minZoom: 0.5,
+            maxZoom: 2.0,
+            smoothing: 0.1,  // Camera follow smoothing (0-1, lower = smoother)
+            targetX: 0,
+            targetY: 0
+        };
+        
         // Pre-computed shortest word for fallback (safe with non-empty dictionary)
         const SHORTEST_WORD = WORD_DICTIONARY.length > 0 
             ? WORD_DICTIONARY.reduce((shortest, word) => word.length < shortest.length ? word : shortest)
@@ -684,7 +766,8 @@
         let gameRunning = false;
         let platforms = [];
         let player = null;
-        let goal = null;  // Goal/end point for the level
+        let goal = null;  // Goal object for animation tracking
+        let goalPlatform = null;  // The platform that acts as the goal
         let playerSpawnY = 0;  // Calculated spawn Y position
         let keys = {};
         let score = 0;
@@ -949,16 +1032,17 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.width = 30;
-                this.height = 30;
+                this.width = BLOCK_SIZE;   // Portal is one block wide
+                this.height = BLOCK_SIZE * 2;  // Portal is 2 blocks tall
                 this.animation = 0;
             }
 
             update() {
-                this.animation += 0.1;
+                this.animation += 0.05;
             }
 
             checkCollision(player) {
+                // Check if player overlaps with the portal
                 return player.x < this.x + this.width &&
                        player.x + player.width > this.x &&
                        player.y < this.y + this.height &&
@@ -966,38 +1050,39 @@
             }
 
             draw() {
-                // Draw animated star/goal
-                const centerX = this.x + this.width / 2;
-                const centerY = this.y + this.height / 2;
-                const outerRadius = 15 + Math.sin(this.animation) * 2;
-                const innerRadius = 7;
-                
+                // Draw portal as shimmering gateway
                 ctx.save();
-                ctx.translate(centerX, centerY);
-                ctx.rotate(this.animation * 0.5);
                 
-                // Draw star
-                ctx.beginPath();
-                for (let i = 0; i < 5; i++) {
-                    const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
-                    const radius = i % 2 === 0 ? outerRadius : innerRadius;
-                    const x = Math.cos(angle) * radius;
-                    const y = Math.sin(angle) * radius;
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.closePath();
+                const glowIntensity = 0.7 + Math.sin(this.animation * 2) * 0.3;
                 
-                // Gradient fill
-                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, outerRadius);
-                gradient.addColorStop(0, '#FFD700');
-                gradient.addColorStop(1, '#FFA500');
+                // Outer glow
+                ctx.shadowColor = '#FFD700';
+                ctx.shadowBlur = 20 * glowIntensity;
+                
+                // Portal gradient (vertical)
+                const gradient = ctx.createLinearGradient(
+                    this.x, this.y,
+                    this.x, this.y + this.height
+                );
+                gradient.addColorStop(0, 'rgba(255, 215, 0, 0.3)');
+                gradient.addColorStop(0.5, 'rgba(255, 215, 0, 0.8)');
+                gradient.addColorStop(1, 'rgba(255, 165, 0, 0.3)');
+                
                 ctx.fillStyle = gradient;
-                ctx.fill();
+                ctx.fillRect(this.x, this.y, this.width, this.height);
                 
-                ctx.strokeStyle = '#FF8C00';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+                // Portal frame/border
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+                
+                // Sparkle particles
+                ctx.shadowBlur = 0;
+                for (let i = 0; i < 3; i++) {
+                    const sparkleY = this.y + (Math.sin(this.animation * 3 + i * 2) + 1) * this.height / 2;
+                    ctx.fillStyle = `rgba(255, 255, 255, ${glowIntensity})`;
+                    ctx.fillRect(this.x + this.width / 2 - 1, sparkleY, 2, 2);
+                }
                 
                 ctx.restore();
             }
@@ -1015,34 +1100,60 @@
             }
 
             draw() {
-                // Add shadow for depth
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-                ctx.shadowBlur = 4;
-                ctx.shadowOffsetX = 2;
-                ctx.shadowOffsetY = 2;
+                // Special glow effect for goal platform
+                if (this.kind === 'goal' && goal) {
+                    const glowIntensity = 0.7 + Math.sin(goal.animation * 2) * 0.3;
+                    ctx.shadowColor = '#FFD700';
+                    ctx.shadowBlur = 15 * glowIntensity;
+                } else {
+                    // Draw shadow for entire platform
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                    ctx.fillRect(this.x + 2, this.y + 2, this.width, this.height);
+                }
                 
-                // Draw platform fill
-                ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
+                // Draw platforms as a series of connected square blocks
+                const numBlocks = Math.floor(this.width / BLOCK_SIZE);
                 
-                // Reset shadow for outline
-                ctx.shadowColor = 'transparent';
+                // Draw individual blocks
+                for (let i = 0; i < numBlocks; i++) {
+                    const blockX = this.x + (i * BLOCK_SIZE);
+                    const blockY = this.y;
+                    
+                    // Main block fill
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(blockX, blockY, BLOCK_SIZE, this.height);
+                    
+                    // Block outline
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(blockX, blockY, BLOCK_SIZE, this.height);
+                    
+                    // Top highlight for each block
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(blockX + 1, blockY + 1);
+                    ctx.lineTo(blockX + BLOCK_SIZE - 1, blockY + 1);
+                    ctx.stroke();
+                }
+                
+                // Handle remaining width (partial block at end)
+                const remainingWidth = this.width - (numBlocks * BLOCK_SIZE);
+                if (remainingWidth > 0) {
+                    const blockX = this.x + (numBlocks * BLOCK_SIZE);
+                    const blockY = this.y;
+                    
+                    ctx.fillStyle = this.color;
+                    ctx.fillRect(blockX, blockY, remainingWidth, this.height);
+                    
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(blockX, blockY, remainingWidth, this.height);
+                }
+                
+                // Reset shadow
                 ctx.shadowBlur = 0;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
-                
-                // Draw thick black outline for visibility
-                ctx.strokeStyle = '#000';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(this.x, this.y, this.width, this.height);
-                
-                // Add highlight on top edge for 3D effect
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(this.x, this.y + 1);
-                ctx.lineTo(this.x + this.width, this.y + 1);
-                ctx.stroke();
+                ctx.shadowColor = 'transparent';
             }
         }
 
@@ -1459,18 +1570,21 @@
             return unionArea > 0 ? interArea / unionArea : 0;
         }
 
-        // Map detected objects to platform candidates using top-edge heuristic
+        // Map detected objects to platform surfaces (top-edge for standing)
         function mapObjectsToPlatforms(detections, canvasWidth, canvasHeight) {
             const platformCandidates = [];
             
             for (const detection of detections) {
                 const [x, y, w, h] = detection.bbox;
                 
-                // Use TOP edge of detected object as platform surface
-                // This is where you would realistically stand on the object (top of chair, car, etc.)
-                const platformY = y;  // Top of the detected object
+                // Use TOP edge as platform surface with block-aligned dimensions
+                const platformY = y;
                 const platformX = x;
-                const platformWidth = w;
+                
+                // Align width to block boundaries
+                const blockCount = Math.max(2, Math.ceil(w / BLOCK_SIZE));  // At least 2 blocks
+                const platformWidth = blockCount * BLOCK_SIZE;
+                const platformHeight = BLOCK_SIZE;  // One block tall
                 
                 // Skip if platform would be in reserved areas
                 const isStartArea = (platformX < START_AREA_WIDTH && platformY > canvasHeight - START_AREA_HEIGHT);
@@ -1482,16 +1596,14 @@
                 if (platformWidth < PLATFORM_MIN_WIDTH) continue;
                 
                 // Skip if platform is outside canvas bounds
-                if (platformY < 0 || platformY > canvasHeight - PLATFORM_THICKNESS) continue;
+                if (platformY < 0 || platformY > canvasHeight - platformHeight) continue;
+                if (platformX + platformWidth > canvasWidth) continue;
                 
-                // All detected objects become solid semi-opaque platforms for smooth gameplay
-                // Use consistent alpha for clear visual feedback (85% opacity)
+                // Semi-transparent platforms that show the photo underneath
                 let color;
                 if (detection.isPlatformable) {
-                    // Green-tinted for explicitly platformable objects
                     color = 'rgba(60, 150, 80, 0.85)';
                 } else {
-                    // Blue-tinted for other detected objects
                     color = 'rgba(80, 100, 160, 0.85)';
                 }
                 
@@ -1499,14 +1611,14 @@
                     x: platformX,
                     y: platformY,
                     width: platformWidth,
-                    height: PLATFORM_THICKNESS,
+                    height: platformHeight,
                     color: color,
                     source: 'ml-detection',
                     detection: detection
                 });
             }
             
-            // Merge nearby platforms on similar Y positions
+            // Merge nearby platforms to reduce clutter
             return mergePlatformCandidates(platformCandidates);
         }
 
@@ -1632,6 +1744,8 @@
 
         // Process image and create platforms
         async function processImage(image) {
+            console.log('processImage called with image:', image.width, 'x', image.height);
+            
             // Store the image for background rendering
             backgroundImage = image;
 
@@ -1759,6 +1873,7 @@
                 const { solid, brightness, cellsX, cellsY } = grid;
                 const segments = [];
 
+                // Extract top surfaces only - keep air space clear for navigation
                 for (let cy = 0; cy < cellsY; cy++) {
                     for (let cx = 0; cx < cellsX; cx++) {
                         if (!solid[cy][cx]) continue;
@@ -1805,87 +1920,268 @@
                 }
                 if (current) merged.push(current);
 
-                // Convert to platform objects, enforcing minimum width + thickness
+                // Convert to platform objects with block-aligned dimensions
                 const platformsOut = [];
                 for (const m of merged) {
                     if (m.width < PLATFORM_MIN_WIDTH) continue;
+                    
+                    // Align platform width to block boundaries for clean appearance
+                    const blockCount = Math.ceil(m.width / BLOCK_SIZE);
+                    const alignedWidth = blockCount * BLOCK_SIZE;
+                    
+                    const platformHeight = BLOCK_SIZE;  // One block tall
                     const color = platformColorFromBrightness(m.brightness);
-                    platformsOut.push(new Platform(m.x, m.y, m.width, PLATFORM_THICKNESS, color, 'photo'));
+                    const mainPlatform = new Platform(m.x, m.y, Math.min(alignedWidth, width - m.x), platformHeight, color, 'photo');
+                    platformsOut.push(mainPlatform);
+                    
+                    // Add wall blocks at the ends of platforms for better climbing
+                    // Left wall block
+                    if (m.x >= BLOCK_SIZE && mainPlatform.width >= BLOCK_SIZE * 3) {
+                        platformsOut.push(new Platform(
+                            m.x, 
+                            m.y - BLOCK_SIZE, 
+                            BLOCK_SIZE, 
+                            BLOCK_SIZE, 
+                            color, 
+                            'photo'
+                        ));
+                    }
+                    // Right wall block
+                    if (mainPlatform.x + mainPlatform.width + BLOCK_SIZE <= width && mainPlatform.width >= BLOCK_SIZE * 3) {
+                        platformsOut.push(new Platform(
+                            mainPlatform.x + mainPlatform.width - BLOCK_SIZE, 
+                            m.y - BLOCK_SIZE, 
+                            BLOCK_SIZE, 
+                            BLOCK_SIZE, 
+                            color, 
+                            'photo'
+                        ));
+                    }
                 }
 
-                return platformsOut;
+                // Filter out platforms that are too close vertically (minimum 1 block spacing)
+                return filterVerticallyClashingPlatforms(platformsOut);
+            }
+            
+            // Remove platforms that are stacked too closely vertically
+            function filterVerticallyClashingPlatforms(platforms) {
+                // Minimum gap should be player width (20px) plus clearance for comfortable passage
+                const minVerticalGap = PLAYER_SIZE + 15;  // 35px - comfortably fits 20px player with margin
+                const filtered = [];
+                
+                // Sort by Y position
+                const sorted = [...platforms].sort((a, b) => a.y - b.y);
+                
+                for (let i = 0; i < sorted.length; i++) {
+                    const current = sorted[i];
+                    let tooClose = false;
+                    
+                    // Check if there's a platform directly below that's too close
+                    for (let j = i + 1; j < sorted.length; j++) {
+                        const below = sorted[j];
+                        
+                        // Check if they overlap horizontally
+                        const horizontalOverlap = !(current.x + current.width <= below.x || below.x + below.width <= current.x);
+                        
+                        if (horizontalOverlap) {
+                            const verticalGap = below.y - (current.y + current.height);
+                            
+                            if (verticalGap > 0 && verticalGap < minVerticalGap) {
+                                tooClose = true;
+                                console.log(`Filtering platform at y=${current.y} - too close to platform at y=${below.y} (gap=${verticalGap}px < ${minVerticalGap}px)`);
+                                break;
+                            }
+                            // Once we find the first platform below with overlap, we can stop checking
+                            break;
+                        }
+                    }
+                    
+                    if (!tooClose) {
+                        filtered.push(current);
+                    }
+                }
+                
+                return filtered;
             }
 
-            function addHelperPlatformsIfNeeded(startPlatform, goalSupportPlatform, allPlatforms, limits) {
-                if (isReachable(startPlatform, goalSupportPlatform, allPlatforms, limits)) {
+            function addHelperPlatformsIfNeeded(startPlatform, goalPlatform, allPlatforms, limits) {
+                if (isReachable(startPlatform, goalPlatform, allPlatforms, limits)) {
                     return;
                 }
 
-                const helperWidth = Math.max(PLATFORM_MIN_WIDTH * 2, 80);
+                // Use smaller, more flexible helper blocks
+                const helperWidthOptions = [BLOCK_SIZE * 2, BLOCK_SIZE * 3];  // Try smallest first: 40px, 60px
+                const helperHeight = BLOCK_SIZE;
                 const helperColor = 'rgba(80, 120, 255, 0.9)';
 
                 let current = startPlatform;
                 let added = 0;
+                let failedAttempts = 0;
+                const maxFailedAttempts = 10;  // Increased tolerance
 
-                while (added < HELPERS_MAX_COUNT) {
-                    if (isReachable(startPlatform, goalSupportPlatform, allPlatforms, limits)) return;
-
-                    const currentCenter = current.x + current.width / 2;
-                    const goalCenter = goalSupportPlatform.x + goalSupportPlatform.width / 2;
-
-                    const toward = Math.sign(goalCenter - currentCenter) || 1;
-                    const stepX = limits.maxJumpDx * 0.8;  // Increased from 0.7 for bigger jumps
-                    const stepUp = limits.maxJumpUp * 0.8; // Increased from 0.7 for bigger vertical steps
-
-                    const targetY = Math.max(WORD_BAR_AREA_HEIGHT, current.y - stepUp);
-                    const idealX = currentCenter + toward * stepX - (helperWidth / 2);
-                    let targetX = Math.max(0, Math.min(width - helperWidth, idealX));
-
-                    // Avoid placing helpers inside the goal reserved area.
-                    const wouldBeInGoalArea = (targetX > width - GOAL_AREA_WIDTH && targetY < GOAL_AREA_HEIGHT);
-                    if (wouldBeInGoalArea) {
-                        targetX = Math.max(0, width - GOAL_AREA_WIDTH - helperWidth - 10);
+                while (added < HELPERS_MAX_COUNT && failedAttempts < maxFailedAttempts) {
+                    if (isReachable(startPlatform, goalPlatform, allPlatforms, limits)) {
+                        console.log(`Goal is reachable after adding ${added} helper platforms`);
+                        return;
                     }
 
-                    const candidate = new Platform(targetX, targetY, helperWidth, PLATFORM_THICKNESS, helperColor, 'helper');
+                    const currentCenter = current.x + current.width / 2;
+                    const goalCenter = goalPlatform.x + goalPlatform.width / 2;
 
-                    // Deterministically search nearby x positions if we collide with existing geometry.
-                    if (overlapsAny(candidate, allPlatforms)) {
-                        let placed = false;
-                        for (let offset = gridSize; offset <= gridSize * 8; offset += gridSize) {
+                    const toward = Math.sign(goalCenter - currentCenter) || 1;
+                    const stepX = limits.maxJumpDx * 0.5;  // Even smaller horizontal steps - 50% of max
+                    const stepUp = limits.maxJumpUp * 0.4;  // Even smaller vertical steps - 40% of max
+
+                    const targetY = Math.max(WORD_BAR_AREA_HEIGHT, current.y - stepUp);
+                    
+                    // Try different helper widths to find one that fits
+                    let placed = false;
+                    
+                    for (const helperWidth of helperWidthOptions) {
+                        if (placed) break;
+                        
+                        const idealX = currentCenter + toward * stepX - (helperWidth / 2);
+                        let targetX = Math.max(0, Math.min(width - helperWidth, idealX));
+
+                        const wouldBeInGoalArea = (targetX > width - GOAL_AREA_WIDTH && targetY < GOAL_AREA_HEIGHT);
+                        if (wouldBeInGoalArea) {
+                            targetX = Math.max(0, width - GOAL_AREA_WIDTH - helperWidth - 10);
+                        }
+
+                        const candidate = new Platform(targetX, targetY, helperWidth, helperHeight, helperColor, 'helper');
+
+                        if (!overlapsAny(candidate, allPlatforms)) {
+                            allPlatforms.push(candidate);
+                            debugHelperPlatforms.push(candidate);
+                            current = candidate;
+                            placed = true;
+                            failedAttempts = 0;
+                            break;
+                        }
+                        
+                        // Try shifting left and right with current width - more aggressive range
+                        for (let offset = BLOCK_SIZE; offset <= BLOCK_SIZE * 15; offset += BLOCK_SIZE) {
                             const leftX = Math.max(0, targetX - offset);
                             const rightX = Math.min(width - helperWidth, targetX + offset);
 
-                            const leftCandidate = new Platform(leftX, targetY, helperWidth, PLATFORM_THICKNESS, helperColor, 'helper');
+                            const leftCandidate = new Platform(leftX, targetY, helperWidth, helperHeight, helperColor, 'helper');
                             if (!overlapsAny(leftCandidate, allPlatforms)) {
                                 allPlatforms.push(leftCandidate);
                                 debugHelperPlatforms.push(leftCandidate);
                                 current = leftCandidate;
                                 placed = true;
+                                failedAttempts = 0;
                                 break;
                             }
 
-                            const rightCandidate = new Platform(rightX, targetY, helperWidth, PLATFORM_THICKNESS, helperColor, 'helper');
+                            const rightCandidate = new Platform(rightX, targetY, helperWidth, helperHeight, helperColor, 'helper');
                             if (!overlapsAny(rightCandidate, allPlatforms)) {
                                 allPlatforms.push(rightCandidate);
                                 debugHelperPlatforms.push(rightCandidate);
                                 current = rightCandidate;
                                 placed = true;
+                                failedAttempts = 0;
                                 break;
                             }
                         }
-
-                        if (!placed) {
-                            // If we can't find a non-overlapping spot, stop adding helpers.
-                            return;
-                        }
-                    } else {
-                        allPlatforms.push(candidate);
-                        debugHelperPlatforms.push(candidate);
-                        current = candidate;
                     }
 
-                    added++;
+                    if (!placed) {
+                        // Try stepping horizontally at same height
+                        for (let stepMultiplier = 2; stepMultiplier <= 5; stepMultiplier++) {
+                            const horizontalHelper = new Platform(
+                                currentCenter + toward * (BLOCK_SIZE * stepMultiplier), 
+                                current.y, 
+                                BLOCK_SIZE * 2, 
+                                helperHeight, 
+                                helperColor, 
+                                'helper'
+                            );
+                            
+                            if (!overlapsAny(horizontalHelper, allPlatforms) && 
+                                horizontalHelper.x >= 0 && 
+                                horizontalHelper.x + horizontalHelper.width <= width) {
+                                allPlatforms.push(horizontalHelper);
+                                debugHelperPlatforms.push(horizontalHelper);
+                                current = horizontalHelper;
+                                placed = true;
+                                failedAttempts = 0;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!placed) {
+                        // Try going down to create descending path
+                        for (let stepMultiplier = 1; stepMultiplier <= 3; stepMultiplier++) {
+                            const downHelper = new Platform(
+                                currentCenter + toward * stepX - BLOCK_SIZE,
+                                Math.min(height - helperHeight - 20, current.y + (stepUp * stepMultiplier)),
+                                BLOCK_SIZE * 2,
+                                helperHeight,
+                                helperColor,
+                                'helper'
+                            );
+                            
+                            if (!overlapsAny(downHelper, allPlatforms) &&
+                                downHelper.x >= 0 &&
+                                downHelper.x + downHelper.width <= width &&
+                                downHelper.y >= WORD_BAR_AREA_HEIGHT) {
+                                allPlatforms.push(downHelper);
+                                debugHelperPlatforms.push(downHelper);
+                                current = downHelper;
+                                placed = true;
+                                failedAttempts = 0;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!placed) {
+                        // Last resort: very small steps in multiple directions
+                        const closeSteps = [
+                            { x: BLOCK_SIZE * 1.5, y: -BLOCK_SIZE * 1.5 },  // diagonal up-forward
+                            { x: BLOCK_SIZE * 2, y: -BLOCK_SIZE },          // forward-up
+                            { x: BLOCK_SIZE * 1, y: -BLOCK_SIZE * 2 },      // up-forward
+                            { x: BLOCK_SIZE * 2, y: 0 },                    // straight forward
+                            { x: BLOCK_SIZE * 1.5, y: BLOCK_SIZE },         // forward-down
+                        ];
+                        
+                        for (const step of closeSteps) {
+                            const closeHelper = new Platform(
+                                currentCenter + (toward * step.x),
+                                current.y + step.y,
+                                BLOCK_SIZE * 2,
+                                helperHeight,
+                                helperColor,
+                                'helper'
+                            );
+                            
+                            if (!overlapsAny(closeHelper, allPlatforms) &&
+                                closeHelper.x >= 0 &&
+                                closeHelper.x + closeHelper.width <= width &&
+                                closeHelper.y >= WORD_BAR_AREA_HEIGHT &&
+                                closeHelper.y + closeHelper.height <= height) {
+                                allPlatforms.push(closeHelper);
+                                debugHelperPlatforms.push(closeHelper);
+                                current = closeHelper;
+                                placed = true;
+                                failedAttempts = 0;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (placed) {
+                        added++;
+                    } else {
+                        failedAttempts++;
+                    }
+                }
+                
+                console.log(`Added ${added} helper platforms (failed attempts: ${failedAttempts})`);
+                if (!isReachable(startPlatform, goalPlatform, allPlatforms, limits)) {
+                    console.warn('⚠️ Warning: Goal may not be reachable even after adding helpers. Try regenerating (G key).');
                 }
             }
 
@@ -1969,9 +2265,9 @@
             // Add a ground platform at the bottom (darker and more opaque)
             platforms.push(new Platform(0, height - 20, width, 20, 'rgba(100, 60, 20, 0.8)', 'ground'));
 
-            // Add starting platform (green to indicate start, larger and clearer)
+            // Add starting platform (green to indicate start, 5 blocks wide)
             const startPlatformY = height - 60;
-            const startPlatform = new Platform(10, startPlatformY, 100, 20, 'rgba(0, 180, 0, 0.9)', 'start');
+            const startPlatform = new Platform(10, startPlatformY, BLOCK_SIZE * 5, BLOCK_SIZE, 'rgba(0, 180, 0, 0.9)', 'start');
             platforms.push(startPlatform);
 
             // Randomly select a goal location from suitable platforms
@@ -2007,24 +2303,47 @@
                 const topCandidates = candidateGoalPlatforms.slice(0, Math.min(MAX_GOAL_CANDIDATES, candidateGoalPlatforms.length));
                 const selectedPlatform = topCandidates[Math.floor(Math.random() * topCandidates.length)];
                 
-                goalX = selectedPlatform.x + selectedPlatform.width / 2 - 15;
-                goalY = selectedPlatform.y - 40; // Above the platform
-                goalSupportPlatform = new Platform(
-                    selectedPlatform.x + selectedPlatform.width / 2 - 25,
-                    selectedPlatform.y - 20,
-                    50, 20, 
+                // Create goal support platform
+                // Ensure platform is low enough that portal above it will be visible
+                const minPlatformY = WORD_BAR_AREA_HEIGHT + (BLOCK_SIZE * 2) + 10;  // Room for portal above
+                const platformY = Math.max(minPlatformY, selectedPlatform.y - BLOCK_SIZE);
+                
+                goalPlatform = new Platform(
+                    selectedPlatform.x + selectedPlatform.width / 2 - (BLOCK_SIZE * 1.5),
+                    platformY,
+                    BLOCK_SIZE * 3, 
+                    BLOCK_SIZE, 
                     'rgba(255, 200, 0, 0.9)', 
                     'goal'
                 );
             } else {
-                // Fallback to top-right if no suitable platforms found
-                goalX = width - 50;
-                goalY = 20;
-                goalSupportPlatform = new Platform(goalX - 10, goalY + 30, 50, 20, 'rgba(255, 200, 0, 0.9)', 'goal');
+                // Fallback to safe position if no suitable platforms found
+                const goalX = width - (BLOCK_SIZE * 4);  // Ensure it's not too close to edge
+                const goalY = WORD_BAR_AREA_HEIGHT + (BLOCK_SIZE * 2) + 20;  // Low enough for portal to be above
+                goalPlatform = new Platform(goalX, goalY, BLOCK_SIZE * 3, BLOCK_SIZE, 'rgba(255, 200, 0, 0.9)', 'goal');
             }
             
-            platforms.push(goalSupportPlatform);
-            goal = new Goal(goalX, goalY);
+            platforms.push(goalPlatform);
+            
+            // Create portal on top of goal platform
+            const portalX = goalPlatform.x + (goalPlatform.width / 2) - (BLOCK_SIZE / 2);  // Center on platform
+            const portalY = goalPlatform.y - (BLOCK_SIZE * 2);  // Portal sits on top of platform
+            
+            goal = new Goal(portalX, portalY);
+            
+            console.log('Goal platform created:', {
+                x: goalPlatform.x,
+                y: goalPlatform.y,
+                width: goalPlatform.width,
+                height: goalPlatform.height,
+                kind: goalPlatform.kind
+            });
+            console.log('Goal portal created:', {
+                x: goal.x,
+                y: goal.y,
+                width: goal.width,
+                height: goal.height
+            });
 
             // Initialize player ON the start platform (not above it)
             playerSpawnY = startPlatformY - 20; // Player height is 20, so spawn on top of platform
@@ -2051,7 +2370,7 @@
 
             // Ensure the level is winnable: add helper platforms only when needed.
             const limits = getJumpLimits();
-            addHelperPlatformsIfNeeded(startPlatform, goalSupportPlatform, platforms, limits);
+            addHelperPlatformsIfNeeded(startPlatform, goalPlatform, platforms, limits);
 
             // Place collectible letters on platforms (pass limits and startPlatform for reachability check)
             placeLettersOnPlatforms(startPlatform, limits);
@@ -2076,10 +2395,15 @@
             collectedLetters = [];
             
             // Get platforms that are suitable for letter placement AND reachable from start
-            // Exclude ground, start, and goal platforms
+            // Exclude ground, start, goal platforms
             const suitablePlatforms = platforms.filter(p => {
-                // Must be a photo/ml/helper platform
+                // Must be a photo/ml/helper platform (NOT goal)
                 if (p.kind !== 'photo' && p.kind !== 'ml' && p.kind !== 'helper') {
+                    return false;
+                }
+                
+                // Don't place letters on goal platform
+                if (p === goalPlatform) {
                     return false;
                 }
                 
@@ -2151,7 +2475,7 @@
             gameRunning = true;
             gameWon = false;  // Reset win state
             canvas.style.display = 'block';
-            gameInfo.style.display = 'block';
+            gameInfo.style.display = 'none';  // Hide old game info (we draw it on canvas now)
             resetBtn.style.display = 'inline-block';
             uploadBtn.style.display = 'none';
             cameraBtn.style.display = 'none';
@@ -2160,7 +2484,16 @@
             wordCompleteBonus = 0;
             correctOrderBonus = 0;
             startTime = Date.now();
-            scoreElement.textContent = score;
+            
+            // Reset camera
+            camera.x = 0;
+            camera.y = 0;
+            camera.zoom = 1.0;
+            camera.targetX = 0;
+            camera.targetY = 0;
+            
+            // Note: Canvas dimensions are set in processImage() based on image aspect ratio
+            // Don't call resizeCanvas() here as it would override those dimensions
             
             // Enter fullscreen when game starts
             enterFullscreen();
@@ -2168,17 +2501,54 @@
             gameLoop();
         }
 
+        // Resize canvas to fill viewport
+        function resizeCanvas() {
+            const container = document.querySelector('.game-canvas-container');
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+
+        // Update camera to follow player
+        function updateCamera() {
+            if (!player) return;
+            
+            // Target camera position (center on player)
+            camera.targetX = player.x + player.width / 2 - (canvas.width / camera.zoom) / 2;
+            camera.targetY = player.y + player.height / 2 - (canvas.height / camera.zoom) / 2;
+            
+            // Smooth camera movement
+            camera.x += (camera.targetX - camera.x) * camera.smoothing;
+            camera.y += (camera.targetY - camera.y) * camera.smoothing;
+            
+            // Clamp camera to level bounds
+            const viewportWidth = canvas.width / camera.zoom;
+            const viewportHeight = canvas.height / camera.zoom;
+            camera.x = Math.max(0, Math.min(camera.x, canvas.width - viewportWidth));
+            camera.y = Math.max(0, Math.min(camera.y, canvas.height - viewportHeight));
+        }
+
         // Main game loop
         function gameLoop() {
             if (!gameRunning) return;
 
-            // Draw the photo as background instead of solid color
+            // Update camera position
+            updateCamera();
+
+            // Clear canvas
+            ctx.fillStyle = '#87ceeb';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Save context state
+            ctx.save();
+            
+            // Apply camera transformation for game world
+            ctx.scale(camera.zoom, camera.zoom);
+            ctx.translate(-camera.x, -camera.y);
+
+            // Draw the photo as background in world space (so it zooms with camera)
             if (backgroundImage) {
                 ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
-            } else {
-                // Fallback to sky blue if no image
-                ctx.fillStyle = '#87ceeb';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
 
             // Update and draw goal
@@ -2223,35 +2593,50 @@
                     }
                 }
                 
-                // Check if player reached the goal
-                if (goal && goal.checkCollision(player)) {
-                    // Calculate bonuses if all letters were collected
-                    if (collectedLetters.length === targetWord.length) {
-                        wordCompleteBonus = WORD_COMPLETE_BONUS;
-                        score += wordCompleteBonus;
-                        
-                        // Check if letters were collected in correct order
-                        let correctOrder = true;
-                        for (let i = 0; i < collectedLetters.length; i++) {
-                            if (collectedLetters[i].index !== i) {
-                                correctOrder = false;
-                                break;
+                // Check if player reached the goal portal
+                if (goal) {
+                    const collision = goal.checkCollision(player);
+                    if (collision) {
+                        console.log('Player reached goal portal!');
+                        console.log('Player:', { x: player.x, y: player.y, width: player.width, height: player.height });
+                        console.log('Goal Portal:', { x: goal.x, y: goal.y, width: goal.width, height: goal.height });
+                        // Calculate bonuses if all letters were collected
+                        if (collectedLetters.length === targetWord.length) {
+                            wordCompleteBonus = WORD_COMPLETE_BONUS;
+                            score += wordCompleteBonus;
+                            
+                            // Check if letters were collected in correct order
+                            let correctOrder = true;
+                            for (let i = 0; i < collectedLetters.length; i++) {
+                                if (collectedLetters[i].index !== i) {
+                                    correctOrder = false;
+                                    break;
+                                }
                             }
+                            
+                            if (correctOrder) {
+                                correctOrderBonus = CORRECT_ORDER_BONUS;
+                                score += correctOrderBonus;
+                            }
+                            
+                            scoreElement.textContent = score;
                         }
-                        
-                        if (correctOrder) {
-                            correctOrderBonus = CORRECT_ORDER_BONUS;
-                            score += correctOrderBonus;
-                        }
-                        
-                        scoreElement.textContent = score;
+                        gameWon = true;
+                        console.log('Game won set to true');
                     }
-                    gameWon = true;
+                } else {
+                    console.warn('goal is null!');
                 }
             } else if (player && gameWon) {
                 // Just draw the player when game is won, don't update
                 player.draw();
             }
+
+            // Restore context for UI overlay (drawn in screen space, not world space)
+            ctx.restore();
+
+            // Draw game info overlay (score, time)
+            drawGameInfoOverlay();
 
             // Draw collected letters display
             drawCollectedLetters();
@@ -2260,12 +2645,76 @@
             if (gameWon) {
                 drawWinMessage();
             }
-
-            // Update time
-            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-            timeElement.textContent = elapsedTime;
+            
+            // Draw zoom level indicator
+            drawZoomIndicator();
 
             requestAnimationFrame(gameLoop);
+        }
+
+        // Draw zoom level indicator
+        function drawZoomIndicator() {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(canvas.width - 80, canvas.height - 40, 70, 30);
+            
+            ctx.fillStyle = '#FFF';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${Math.round(camera.zoom * 100)}%`, canvas.width - 45, canvas.height - 25);
+            ctx.restore();
+        }
+
+        // Draw game info overlay (score, time, controls hint)
+        function drawGameInfoOverlay() {
+            ctx.save();
+            
+            // Top-right corner - Score and Time
+            const infoX = canvas.width - 10;
+            const infoY = 10;
+            
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'top';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.lineWidth = 4;
+            ctx.fillStyle = '#FFD700';
+            
+            const scoreText = `Score: ${score}`;
+            ctx.strokeText(scoreText, infoX, infoY);
+            ctx.fillText(scoreText, infoX, infoY);
+            
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            const timeText = `Time: ${elapsedTime}s`;
+            ctx.strokeText(timeText, infoX, infoY + 22);
+            ctx.fillText(timeText, infoX, infoY + 22);
+            
+            // Bottom-left corner - Controls hint
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (!isMobile) {
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'bottom';
+                const controlsY = canvas.height - 8;
+                const controlsX = 10;
+                
+                // Draw background for better readability
+                const text = 'Controls: Arrows/Space/WASD | Zoom: +/- | R: Respawn | G: Regenerate';
+                const textWidth = ctx.measureText(text).width;
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(controlsX - 5, controlsY - 16, textWidth + 10, 20);
+                
+                // Draw text with outline for maximum visibility
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+                ctx.lineWidth = 3;
+                ctx.strokeText(text, controlsX, controlsY);
+                
+                ctx.fillStyle = '#FFD700';  // Gold color for better visibility
+                ctx.fillText(text, controlsX, controlsY);
+            }
+            
+            ctx.restore();
         }
 
         function drawDebugOverlay() {
@@ -2335,23 +2784,30 @@
             
             ctx.save();
             
-            // Draw background panel
-            const panelHeight = 40;
+            // Calculate panel width based on content
+            const letterSpacing = 25;
+            const panelPadding = 20;
+            const labelWidth = 60;
+            const progressWidth = 40;
+            const panelWidth = labelWidth + (targetWord.length * letterSpacing) + progressWidth + panelPadding;
+            
+            // Draw background panel (compact, left-aligned)
+            const panelHeight = 35;
             const panelY = 10;
+            const panelX = 10;
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(10, panelY, canvas.width - 20, panelHeight);
+            ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
             
             // Draw label
             ctx.fillStyle = '#FFF';
-            ctx.font = 'bold 14px Arial';
+            ctx.font = 'bold 13px Arial';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            ctx.fillText('Collect:', 20, panelY + panelHeight / 2);
+            ctx.fillText('Word:', panelX + 10, panelY + panelHeight / 2);
             
             // Draw target word letters
-            const letterSpacing = 25;
-            const startX = 90;
-            ctx.font = 'bold 18px Arial';
+            const startX = panelX + labelWidth;
+            ctx.font = 'bold 16px Arial';
             ctx.textAlign = 'center';
             
             // Create a Set of collected indices for O(1) lookup during rendering
@@ -2371,7 +2827,7 @@
                     ctx.fillStyle = '#555';
                 }
                 ctx.beginPath();
-                ctx.arc(x, y, 10, 0, Math.PI * 2);
+                ctx.arc(x, y, 9, 0, Math.PI * 2);
                 ctx.fill();
                 
                 // Draw letter
@@ -2380,10 +2836,10 @@
             }
             
             // Draw collection progress
-            ctx.font = '14px Arial';
+            ctx.font = '12px Arial';
             ctx.textAlign = 'right';
             ctx.fillStyle = '#FFD700';
-            ctx.fillText(`${collectedLetters.length}/${targetWord.length}`, canvas.width - 20, panelY + panelHeight / 2);
+            ctx.fillText(`${collectedLetters.length}/${targetWord.length}`, panelX + panelWidth - 10, panelY + panelHeight / 2);
             
             ctx.restore();
         }
@@ -2661,8 +3117,10 @@
         });
 
         fileInput.addEventListener('change', (e) => {
+            console.log('File input changed');
             const file = e.target.files[0];
             if (file) {
+                console.log('File selected:', file.name, file.type, file.size);
                 // Validate file type
                 if (!file.type.match('image.*')) {
                     alert('Please select a valid image file.');
@@ -2677,14 +3135,20 @@
                 
                 const reader = new FileReader();
                 reader.onload = (event) => {
+                    console.log('FileReader loaded');
                     const img = new Image();
-                    img.onload = () => processImage(img);
+                    img.onload = () => {
+                        console.log('Image loaded, calling processImage');
+                        processImage(img);
+                    };
                     img.onerror = () => {
+                        console.error('Image load error');
                         alert('Failed to load image. Please try a different file.');
                     };
                     img.src = event.target.result;
                 };
                 reader.onerror = () => {
+                    console.error('FileReader error');
                     alert('Failed to read file. Please try again.');
                 };
                 reader.readAsDataURL(file);
@@ -2783,9 +3247,41 @@
             
             if (shouldIgnoreGameKeyEvent(e)) return;
             
+            // Zoom controls with + and - keys
+            if (e.key === '=' || e.key === '+') {
+                camera.zoom = Math.min(camera.maxZoom, camera.zoom + 0.1);
+                e.preventDefault();
+                return;
+            }
+            if (e.key === '-' || e.key === '_') {
+                camera.zoom = Math.max(camera.minZoom, camera.zoom - 0.1);
+                e.preventDefault();
+                return;
+            }
+            // Reset zoom with '0'
+            if (e.key === '0') {
+                camera.zoom = 1.0;
+                e.preventDefault();
+                return;
+            }
+            
             // Manual respawn with 'R' key
             if ((e.key === 'r' || e.key === 'R') && player && gameRunning) {
                 player.respawn();
+                e.preventDefault();
+                return;
+            }
+            
+            // Regenerate level with 'G' key
+            if ((e.key === 'g' || e.key === 'G') && backgroundImage && gameRunning) {
+                console.log('Regenerating level...');
+                gameRunning = false;  // Stop current game loop
+                
+                // Small delay to ensure current frame completes
+                setTimeout(() => {
+                    processImage(backgroundImage);
+                }, 50);
+                
                 e.preventDefault();
                 return;
             }
@@ -2794,6 +3290,22 @@
             // Prevent default for arrow keys and space
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
                 e.preventDefault();
+            }
+        });
+
+        // Mouse wheel zoom
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (!gameRunning) return;
+            
+            const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
+            camera.zoom = Math.max(camera.minZoom, Math.min(camera.maxZoom, camera.zoom + zoomDelta));
+        }, { passive: false });
+
+        // Resize canvas when window resizes
+        window.addEventListener('resize', () => {
+            if (gameRunning) {
+                resizeCanvas();
             }
         });
 
@@ -2889,6 +3401,38 @@
         jumpBtn.addEventListener('touchcancel', (e) => {
             e.preventDefault();
             touchJumping = false;
+        });
+
+        // Zoom control buttons
+        zoomInBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            camera.zoom = Math.min(camera.maxZoom, camera.zoom + 0.2);
+        });
+
+        zoomOutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            camera.zoom = Math.max(camera.minZoom, camera.zoom - 0.2);
+        });
+
+        zoomResetBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            camera.zoom = 1.0;
+        });
+
+        // Touch support for zoom buttons
+        zoomInBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            camera.zoom = Math.min(camera.maxZoom, camera.zoom + 0.2);
+        });
+
+        zoomOutBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            camera.zoom = Math.max(camera.minZoom, camera.zoom - 0.2);
+        });
+
+        zoomResetBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            camera.zoom = 1.0;
         });
 
         document.addEventListener('keydown', (e) => {
