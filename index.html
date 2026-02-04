@@ -1961,8 +1961,8 @@
                 return filtered;
             }
 
-            function addHelperPlatformsIfNeeded(startPlatform, goalSupportPlatform, allPlatforms, limits) {
-                if (isReachable(startPlatform, goalSupportPlatform, allPlatforms, limits)) {
+            function addHelperPlatformsIfNeeded(startPlatform, goalPlatform, allPlatforms, limits) {
+                if (isReachable(startPlatform, goalPlatform, allPlatforms, limits)) {
                     return;
                 }
 
@@ -1977,10 +1977,10 @@
                 const maxFailedAttempts = 5;
 
                 while (added < HELPERS_MAX_COUNT && failedAttempts < maxFailedAttempts) {
-                    if (isReachable(startPlatform, goalSupportPlatform, allPlatforms, limits)) return;
+                    if (isReachable(startPlatform, goalPlatform, allPlatforms, limits)) return;
 
                     const currentCenter = current.x + current.width / 2;
-                    const goalCenter = goalSupportPlatform.x + goalSupportPlatform.width / 2;
+                    const goalCenter = goalPlatform.x + goalPlatform.width / 2;
 
                     const toward = Math.sign(goalCenter - currentCenter) || 1;
                     const stepX = limits.maxJumpDx * 0.55;  // Even smaller horizontal steps
@@ -2276,7 +2276,7 @@
 
             // Ensure the level is winnable: add helper platforms only when needed.
             const limits = getJumpLimits();
-            addHelperPlatformsIfNeeded(startPlatform, goalSupportPlatform, platforms, limits);
+            addHelperPlatformsIfNeeded(startPlatform, goalPlatform, platforms, limits);
 
             // Place collectible letters on platforms (pass limits and startPlatform for reachability check)
             placeLettersOnPlatforms(startPlatform, limits);
