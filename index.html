@@ -2101,8 +2101,16 @@
             const availableWords = WORD_DICTIONARY.filter(word => word.length <= suitablePlatforms.length);
             
             if (availableWords.length === 0) {
-                // If no words fit, use the pre-computed shortest word
-                targetWord = SHORTEST_WORD;
+                // If no words fit (not enough reachable platforms), truncate the shortest word
+                // to match the number of available platforms
+                const baseWord = SHORTEST_WORD;
+                targetWord = baseWord.substring(0, Math.min(baseWord.length, suitablePlatforms.length));
+                
+                // If still no platforms, exit early
+                if (suitablePlatforms.length === 0 || targetWord.length === 0) {
+                    console.warn('Not enough reachable platforms for any word');
+                    return;
+                }
             } else {
                 targetWord = availableWords[Math.floor(Math.random() * availableWords.length)];
             }
@@ -2113,6 +2121,12 @@
             // Place each letter of the word on different platforms (one letter per platform)
             for (let i = 0; i < targetWord.length; i++) {
                 const platform = shuffledPlatforms[i];  // Direct indexing since word length <= platform count
+                
+                // Safety check: ensure platform exists (should always be true due to filtering above)
+                if (!platform) {
+                    console.error(`Platform ${i} is undefined for letter ${targetWord[i]}`);
+                    continue;
+                }
                 
                 // Place letter on top of platform, centered with some randomness
                 const platformCenterX = platform.x + platform.width / 2;
