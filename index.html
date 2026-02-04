@@ -663,8 +663,9 @@
         const STUCK_MOVEMENT_THRESHOLD = 5;  // pixels
 
         // Letter collection constants
-        const LETTER_SIZE = 20;
-        const LETTER_POINTS = 10;  // Points per letter
+        const COLLECTIBLE_LETTER_SIZE = 20;
+        const COLLECTIBLE_LETTER_POINTS = 10;  // Points per letter
+        const COLLECTIBLE_LETTER_FLOAT_SPEED = 0.1;  // Animation speed for floating effect
         const WORD_COMPLETE_BONUS = 50;  // Bonus for collecting all letters
         const CORRECT_ORDER_BONUS = 100;  // Extra bonus for correct order
         const WORD_DICTIONARY = ['JUMP', 'PLAY', 'GAME', 'PHOTO', 'STAR', 'GOAL', 'WIN', 'FUN'];
@@ -1042,15 +1043,16 @@
                 this.char = char;
                 this.x = x;
                 this.y = y;
-                this.width = LETTER_SIZE;
-                this.height = LETTER_SIZE;
+                this.width = COLLECTIBLE_LETTER_SIZE;
+                this.height = COLLECTIBLE_LETTER_SIZE;
                 this.collected = false;
                 this.index = index;  // Position in the target word
                 this.animation = 0;
             }
 
             update() {
-                this.animation += 0.1;
+                // Increment animation for floating effect
+                this.animation += COLLECTIBLE_LETTER_FLOAT_SPEED;
             }
 
             checkCollision(player) {
@@ -1074,7 +1076,7 @@
                 ctx.shadowBlur = 10;
                 ctx.fillStyle = '#FFD700';
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, LETTER_SIZE / 2, 0, Math.PI * 2);
+                ctx.arc(centerX, centerY, COLLECTIBLE_LETTER_SIZE / 2, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Reset shadow
@@ -1085,7 +1087,7 @@
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, LETTER_SIZE / 2, 0, Math.PI * 2);
+                ctx.arc(centerX, centerY, COLLECTIBLE_LETTER_SIZE / 2, 0, Math.PI * 2);
                 ctx.stroke();
 
                 // Draw the letter
@@ -2049,8 +2051,8 @@
                 // Place letter on top of platform, centered with some randomness
                 const platformCenterX = platform.x + platform.width / 2;
                 const randomOffsetX = (Math.random() - 0.5) * Math.min(platform.width * 0.4, 30);
-                const letterX = platformCenterX + randomOffsetX - LETTER_SIZE / 2;
-                const letterY = platform.y - LETTER_SIZE - 10;  // 10px above platform
+                const letterX = platformCenterX + randomOffsetX - COLLECTIBLE_LETTER_SIZE / 2;
+                const letterY = platform.y - COLLECTIBLE_LETTER_SIZE - 10;  // 10px above platform
                 
                 letters.push(new Letter(targetWord[i], letterX, letterY, i));
             }
@@ -2108,10 +2110,12 @@
                 drawDebugOverlay();
             }
 
-            // Update and draw letters
+            // Update and draw letters (skip collected ones for performance)
             for (let letter of letters) {
-                letter.update();
-                letter.draw();
+                if (!letter.collected) {
+                    letter.update();
+                    letter.draw();
+                }
             }
 
             // Update and draw player
@@ -2126,7 +2130,7 @@
                         collectedLetters.push(letter);
                         
                         // Add points for the letter
-                        score += LETTER_POINTS;
+                        score += COLLECTIBLE_LETTER_POINTS;
                         scoreElement.textContent = score;
                         
                         console.log(`Collected letter: ${letter.char} (${collectedLetters.length}/${targetWord.length})`);
