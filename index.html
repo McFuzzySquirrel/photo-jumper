@@ -659,7 +659,7 @@
         const GOAL_AREA_HEIGHT = 80;
         
         // Stuck detection constants
-        const STUCK_CHECK_INTERVAL = 5000;  // 5 seconds (increased to avoid false positives during letter collection)
+        const STUCK_CHECK_INTERVAL = 5000;  // 5 seconds (increased to avoid false positives during normal stationary gameplay)
         const STUCK_MOVEMENT_THRESHOLD = 5;  // pixels
 
         // Letter collection constants
@@ -2076,8 +2076,8 @@
                     return false;
                 }
                 
-                // Must be reachable from the start platform
-                if (!canReachPlatform(startPlatform, p, limits)) {
+                // Must be reachable from the start platform (including multi-hop paths)
+                if (!isReachable(startPlatform, p, platforms, limits)) {
                     return false;
                 }
                 
