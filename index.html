@@ -2280,6 +2280,14 @@
             
             platforms.push(goalPlatform);
             goal = new Goal(0, 0);  // Just for animation tracking
+            
+            console.log('Goal platform created:', {
+                x: goalPlatform.x,
+                y: goalPlatform.y,
+                width: goalPlatform.width,
+                height: goalPlatform.height,
+                kind: goalPlatform.kind
+            });
 
             // Initialize player ON the start platform (not above it)
             playerSpawnY = startPlatformY - 20; // Player height is 20, so spawn on top of platform
@@ -2530,31 +2538,38 @@
                 }
                 
                 // Check if player reached the goal platform
-                if (goalPlatform && player.checkCollision(goalPlatform)) {
-                    console.log('Player reached goal platform!');
-                    // Calculate bonuses if all letters were collected
-                    if (collectedLetters.length === targetWord.length) {
-                        wordCompleteBonus = WORD_COMPLETE_BONUS;
-                        score += wordCompleteBonus;
-                        
-                        // Check if letters were collected in correct order
-                        let correctOrder = true;
-                        for (let i = 0; i < collectedLetters.length; i++) {
-                            if (collectedLetters[i].index !== i) {
-                                correctOrder = false;
-                                break;
+                if (goalPlatform) {
+                    const collision = player.checkCollision(goalPlatform);
+                    if (collision) {
+                        console.log('Player reached goal platform!');
+                        console.log('Player:', { x: player.x, y: player.y, width: player.width, height: player.height });
+                        console.log('Goal Platform:', { x: goalPlatform.x, y: goalPlatform.y, width: goalPlatform.width, height: goalPlatform.height });
+                        // Calculate bonuses if all letters were collected
+                        if (collectedLetters.length === targetWord.length) {
+                            wordCompleteBonus = WORD_COMPLETE_BONUS;
+                            score += wordCompleteBonus;
+                            
+                            // Check if letters were collected in correct order
+                            let correctOrder = true;
+                            for (let i = 0; i < collectedLetters.length; i++) {
+                                if (collectedLetters[i].index !== i) {
+                                    correctOrder = false;
+                                    break;
+                                }
                             }
+                            
+                            if (correctOrder) {
+                                correctOrderBonus = CORRECT_ORDER_BONUS;
+                                score += correctOrderBonus;
+                            }
+                            
+                            scoreElement.textContent = score;
                         }
-                        
-                        if (correctOrder) {
-                            correctOrderBonus = CORRECT_ORDER_BONUS;
-                            score += correctOrderBonus;
-                        }
-                        
-                        scoreElement.textContent = score;
+                        gameWon = true;
+                        console.log('Game won set to true');
                     }
-                    gameWon = true;
-                    console.log('Game won set to true');
+                } else {
+                    console.warn('goalPlatform is null!');
                 }
             } else if (player && gameWon) {
                 // Just draw the player when game is won, don't update
