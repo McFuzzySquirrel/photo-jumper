@@ -659,8 +659,26 @@
         const GOAL_AREA_HEIGHT = 80;
         
         // Stuck detection constants
-        const STUCK_CHECK_INTERVAL = 3000;  // 3 seconds
+        // Increased to avoid false positives during normal stationary gameplay (planning, waiting)
+        const STUCK_CHECK_INTERVAL = 5000;  // 5 seconds
         const STUCK_MOVEMENT_THRESHOLD = 5;  // pixels
+
+        // Letter collection constants
+        const COLLECTIBLE_LETTER_SIZE = 20;
+        const COLLECTIBLE_LETTER_POINTS = 10;  // Points per letter
+        const COLLECTIBLE_LETTER_FLOAT_SPEED = 0.1;  // Animation speed for floating effect
+        const COLLECTIBLE_LETTER_OFFSET_RATIO = 0.4;  // Ratio of platform width for random offset
+        const COLLECTIBLE_LETTER_MAX_OFFSET = 30;  // Maximum horizontal offset in pixels
+        const COLLECTIBLE_LETTER_VERTICAL_OFFSET = 10;  // Pixels above platform
+        const WORD_COMPLETE_BONUS = 50;  // Bonus for collecting all letters
+        const CORRECT_ORDER_BONUS = 100;  // Extra bonus for correct order
+        const WORD_DICTIONARY = ['JUMP', 'PLAY', 'GAME', 'PHOTO', 'STAR', 'GOAL', 'WIN', 'FUN'];
+        const MAX_GOAL_CANDIDATES = 3;  // Number of top goal platform candidates to randomly select from
+        
+        // Pre-computed shortest word for fallback (safe with non-empty dictionary)
+        const SHORTEST_WORD = WORD_DICTIONARY.length > 0 
+            ? WORD_DICTIONARY.reduce((shortest, word) => word.length < shortest.length ? word : shortest)
+            : 'FUN';  // Fallback if dictionary is somehow empty
 
         let gameRunning = false;
         let platforms = [];
@@ -675,6 +693,13 @@
         let touchJumping = false;
         let backgroundImage = null; // Store the uploaded photo for background
         let gameWon = false;  // Track if player reached the goal
+
+        // Letter collection game state
+        let letters = [];  // Array of Letter objects
+        let collectedLetters = [];  // Array of collected letters in order
+        let targetWord = '';  // The word to spell
+        let wordCompleteBonus = 0;  // Bonus earned for completing word
+        let correctOrderBonus = 0;  // Bonus earned for correct order
 
         let debugOverlayEnabled = DEBUG_DEFAULT_ENABLED;
         let debugSolidGrid = null;
@@ -779,8 +804,10 @@
                 // Horizontal movement
                 if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
                     this.velocityX = -this.speed;
+                    this.lastPositionTime = Date.now(); // Reset stuck timer on input
                 } else if (keys['ArrowRight'] || keys['d'] || keys['D']) {
                     this.velocityX = this.speed;
+                    this.lastPositionTime = Date.now(); // Reset stuck timer on input
                 } else {
                     this.velocityX *= 0.7; // Reduced friction for more responsive feel
                 }
@@ -790,6 +817,7 @@
                     this.velocityY = -this.jumpPower;
                     this.onGround = false;
                     touchJumping = false; // Reset touch jump
+                    this.lastPositionTime = Date.now(); // Reset stuck timer on input
                 }
 
                 // Apply gravity
@@ -1014,6 +1042,68 @@
                 ctx.moveTo(this.x, this.y + 1);
                 ctx.lineTo(this.x + this.width, this.y + 1);
                 ctx.stroke();
+            }
+        }
+
+        // Letter class for collectible letters
+        class Letter {
+            constructor(char, x, y, index) {
+                this.char = char;
+                this.x = x;
+                this.y = y;
+                this.width = COLLECTIBLE_LETTER_SIZE;
+                this.height = COLLECTIBLE_LETTER_SIZE;
+                this.collected = false;
+                this.index = index;  // Position in the target word
+                this.animation = 0;
+            }
+
+            update() {
+                // Increment animation for floating effect
+                this.animation += COLLECTIBLE_LETTER_FLOAT_SPEED;
+            }
+
+            checkCollision(player) {
+                return !this.collected &&
+                       player.x < this.x + this.width &&
+                       player.x + player.width > this.x &&
+                       player.y < this.y + this.height &&
+                       player.y + player.height > this.y;
+            }
+
+            draw() {
+                if (this.collected) return;
+
+                // Floating animation
+                const floatOffset = Math.sin(this.animation) * 3;
+                const centerX = this.x + this.width / 2;
+                const centerY = this.y + this.height / 2 + floatOffset;
+
+                // Draw circular background with glow
+                ctx.shadowColor = 'rgba(255, 215, 0, 0.8)';
+                ctx.shadowBlur = 10;
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, COLLECTIBLE_LETTER_SIZE / 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Reset shadow
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+
+                // Draw black outline
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, COLLECTIBLE_LETTER_SIZE / 2, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Draw the letter
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.char, centerX, centerY);
             }
         }
 
@@ -1454,6 +1544,90 @@
         // End ONNX ML Detection Functions
         // ==========================================
 
+        // Helper functions for reachability checking
+        function intervalGap(a1, a2, b1, b2) {
+            if (a2 < b1) return b1 - a2;
+            if (b2 < a1) return a1 - b2;
+            return 0;
+        }
+
+        function getJumpLimits() {
+            const jumpPower = PLAYER_JUMP_POWER;
+            const gravity = PLAYER_GRAVITY;
+            const speed = PLAYER_SPEED;
+
+            const maxJumpUp = (jumpPower * jumpPower) / (2 * gravity);
+            const maxHangTime = (2 * jumpPower) / gravity;
+            const maxJumpDx = speed * maxHangTime;
+
+            // Conservative safety margins (gameplay-first): if we say reachable, it should be reachable.
+            return {
+                maxJumpUp: maxJumpUp * 0.9,
+                maxJumpDx: maxJumpDx * 0.85,
+                jumpPower,
+                gravity,
+                speed
+            };
+        }
+
+        function canReachPlatform(from, to, limits) {
+            if (from === to) return false;
+
+            const fromLeft = from.x;
+            const fromRight = from.x + from.width;
+            const toLeft = to.x;
+            const toRight = to.x + to.width;
+
+            const dx = intervalGap(fromLeft, fromRight, toLeft, toRight);
+            if (dx > limits.maxJumpDx) return false;
+
+            const up = from.y - to.y;
+            if (up <= 0) {
+                // Dropping down is allowed; keep conservative horizontal requirement only.
+                return true;
+            }
+
+            if (up > limits.maxJumpUp) return false;
+
+            // More accurate horizontal limit for higher targets: time to reach that height (descending).
+            const disc = (limits.jumpPower * limits.jumpPower) - (2 * limits.gravity * up);
+            if (disc < 0) return false;
+            const tLanding = (limits.jumpPower + Math.sqrt(disc)) / limits.gravity;
+            const dxLimit = Math.min(limits.maxJumpDx, limits.speed * tLanding * 0.9);
+            return dx <= dxLimit;
+        }
+
+        function isReachable(startPlatform, goalPlatform, allPlatforms, limits) {
+            const visited = new Set();
+            const queue = [startPlatform];
+            visited.add(startPlatform);
+
+            while (queue.length) {
+                const current = queue.shift();
+                if (current === goalPlatform) return true;
+
+                for (const next of allPlatforms) {
+                    if (visited.has(next)) continue;
+                    if (!canReachPlatform(current, next, limits)) continue;
+                    visited.add(next);
+                    queue.push(next);
+                }
+            }
+
+            return false;
+        }
+
+        function overlapsAny(candidate, allPlatforms) {
+            for (const p of allPlatforms) {
+                const overlaps = !(candidate.x + candidate.width <= p.x ||
+                    candidate.x >= p.x + p.width ||
+                    candidate.y + candidate.height <= p.y ||
+                    candidate.y >= p.y + p.height);
+                if (overlaps) return true;
+            }
+            return false;
+        }
+
         // Process image and create platforms
         async function processImage(image) {
             // Store the image for background rendering
@@ -1638,89 +1812,6 @@
                 return platformsOut;
             }
 
-            function intervalGap(a1, a2, b1, b2) {
-                if (a2 < b1) return b1 - a2;
-                if (b2 < a1) return a1 - b2;
-                return 0;
-            }
-
-            function getJumpLimits() {
-                const jumpPower = PLAYER_JUMP_POWER;
-                const gravity = PLAYER_GRAVITY;
-                const speed = PLAYER_SPEED;
-
-                const maxJumpUp = (jumpPower * jumpPower) / (2 * gravity);
-                const maxHangTime = (2 * jumpPower) / gravity;
-                const maxJumpDx = speed * maxHangTime;
-
-                // Conservative safety margins (gameplay-first): if we say reachable, it should be reachable.
-                return {
-                    maxJumpUp: maxJumpUp * 0.9,
-                    maxJumpDx: maxJumpDx * 0.85,
-                    jumpPower,
-                    gravity,
-                    speed
-                };
-            }
-
-            function canReachPlatform(from, to, limits) {
-                if (from === to) return false;
-
-                const fromLeft = from.x;
-                const fromRight = from.x + from.width;
-                const toLeft = to.x;
-                const toRight = to.x + to.width;
-
-                const dx = intervalGap(fromLeft, fromRight, toLeft, toRight);
-                if (dx > limits.maxJumpDx) return false;
-
-                const up = from.y - to.y;
-                if (up <= 0) {
-                    // Dropping down is allowed; keep conservative horizontal requirement only.
-                    return true;
-                }
-
-                if (up > limits.maxJumpUp) return false;
-
-                // More accurate horizontal limit for higher targets: time to reach that height (descending).
-                const disc = (limits.jumpPower * limits.jumpPower) - (2 * limits.gravity * up);
-                if (disc < 0) return false;
-                const tLanding = (limits.jumpPower + Math.sqrt(disc)) / limits.gravity;
-                const dxLimit = Math.min(limits.maxJumpDx, limits.speed * tLanding * 0.9);
-                return dx <= dxLimit;
-            }
-
-            function isReachable(startPlatform, goalPlatform, allPlatforms, limits) {
-                const visited = new Set();
-                const queue = [startPlatform];
-                visited.add(startPlatform);
-
-                while (queue.length) {
-                    const current = queue.shift();
-                    if (current === goalPlatform) return true;
-
-                    for (const next of allPlatforms) {
-                        if (visited.has(next)) continue;
-                        if (!canReachPlatform(current, next, limits)) continue;
-                        visited.add(next);
-                        queue.push(next);
-                    }
-                }
-
-                return false;
-            }
-
-            function overlapsAny(candidate, allPlatforms) {
-                for (const p of allPlatforms) {
-                    const overlaps = !(candidate.x + candidate.width <= p.x ||
-                        candidate.x >= p.x + p.width ||
-                        candidate.y + candidate.height <= p.y ||
-                        candidate.y >= p.y + p.height);
-                    if (overlaps) return true;
-                }
-                return false;
-            }
-
             function addHelperPlatformsIfNeeded(startPlatform, goalSupportPlatform, allPlatforms, limits) {
                 if (isReachable(startPlatform, goalSupportPlatform, allPlatforms, limits)) {
                     return;
@@ -1880,11 +1971,55 @@
             const startPlatform = new Platform(10, startPlatformY, 100, 20, 'rgba(0, 180, 0, 0.9)', 'start');
             platforms.push(startPlatform);
 
-            // Add goal at top-right corner of the level
-            const goalX = width - 50;
-            const goalY = 20;
-            // Add a platform for the goal to sit on (golden and more visible)
-            const goalSupportPlatform = new Platform(goalX - 10, goalY + 30, 50, 20, 'rgba(255, 200, 0, 0.9)', 'goal');
+            // Randomly select a goal location from suitable platforms
+            // Goal should be: reachable, sufficiently far from start, preferably high up
+            let goalSupportPlatform = null;
+            let goalX, goalY;
+            
+            // Get candidate platforms for goal placement (photo/ml platforms in upper half)
+            const candidateGoalPlatforms = platforms.filter(p => {
+                if (p.kind !== 'photo' && p.kind !== 'ml') return false;
+                // Prefer upper 60% of the level
+                if (p.y > height * 0.6) return false;
+                // Must not overlap with start area
+                if (p.x < 150 && p.y > height - 150) return false;
+                return true;
+            });
+            
+            // If we have suitable candidates, pick one randomly
+            if (candidateGoalPlatforms.length > 0) {
+                // Sort by height (higher is better) and distance from start
+                const startCenter = { x: 60, y: startPlatformY };
+                candidateGoalPlatforms.sort((a, b) => {
+                    // Calculate distance once for each platform
+                    const aDistSq = (a.x - startCenter.x) ** 2 + (a.y - startCenter.y) ** 2;
+                    const bDistSq = (b.x - startCenter.x) ** 2 + (b.y - startCenter.y) ** 2;
+                    // Prefer high (negative y) + far (positive distance)
+                    const aScore = -a.y * 2 + Math.sqrt(aDistSq);
+                    const bScore = -b.y * 2 + Math.sqrt(bDistSq);
+                    return bScore - aScore;
+                });
+                
+                // Pick from top candidates randomly for variety
+                const topCandidates = candidateGoalPlatforms.slice(0, Math.min(MAX_GOAL_CANDIDATES, candidateGoalPlatforms.length));
+                const selectedPlatform = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+                
+                goalX = selectedPlatform.x + selectedPlatform.width / 2 - 15;
+                goalY = selectedPlatform.y - 40; // Above the platform
+                goalSupportPlatform = new Platform(
+                    selectedPlatform.x + selectedPlatform.width / 2 - 25,
+                    selectedPlatform.y - 20,
+                    50, 20, 
+                    'rgba(255, 200, 0, 0.9)', 
+                    'goal'
+                );
+            } else {
+                // Fallback to top-right if no suitable platforms found
+                goalX = width - 50;
+                goalY = 20;
+                goalSupportPlatform = new Platform(goalX - 10, goalY + 30, 50, 20, 'rgba(255, 200, 0, 0.9)', 'goal');
+            }
+            
             platforms.push(goalSupportPlatform);
             goal = new Goal(goalX, goalY);
 
@@ -1915,8 +2050,80 @@
             const limits = getJumpLimits();
             addHelperPlatformsIfNeeded(startPlatform, goalSupportPlatform, platforms, limits);
 
+            // Place collectible letters on platforms (pass limits and startPlatform for reachability check)
+            placeLettersOnPlatforms(startPlatform, limits);
+
             // Start game
             startGame();
+        }
+
+        // Fisher-Yates shuffle algorithm for unbiased array shuffling
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        // Place letters on platforms to spell a word
+        function placeLettersOnPlatforms(startPlatform, limits) {
+            letters = [];
+            collectedLetters = [];
+            
+            // Get platforms that are suitable for letter placement AND reachable from start
+            // Exclude ground, start, and goal platforms
+            const suitablePlatforms = platforms.filter(p => {
+                // Must be a photo/ml/helper platform
+                if (p.kind !== 'photo' && p.kind !== 'ml' && p.kind !== 'helper') {
+                    return false;
+                }
+                
+                // Must be reachable from the start platform (including multi-hop paths)
+                if (!isReachable(startPlatform, p, platforms, limits)) {
+                    return false;
+                }
+                
+                return true;
+            });
+            
+            if (suitablePlatforms.length === 0) {
+                console.warn('No suitable reachable platforms for letter placement');
+                return;
+            }
+            
+            // Choose a word that fits the available platforms
+            // Filter words that have length <= number of suitable platforms
+            const availableWords = WORD_DICTIONARY.filter(word => word.length <= suitablePlatforms.length);
+            
+            if (availableWords.length === 0) {
+                // If no words fit, use the pre-computed shortest word
+                targetWord = SHORTEST_WORD;
+            } else {
+                targetWord = availableWords[Math.floor(Math.random() * availableWords.length)];
+            }
+            
+            // Shuffle platforms using Fisher-Yates algorithm
+            const shuffledPlatforms = shuffleArray(suitablePlatforms);
+            
+            // Place each letter of the word on different platforms (one letter per platform)
+            for (let i = 0; i < targetWord.length; i++) {
+                const platform = shuffledPlatforms[i];  // Direct indexing since word length <= platform count
+                
+                // Place letter on top of platform, centered with some randomness
+                const platformCenterX = platform.x + platform.width / 2;
+                const randomOffsetX = (Math.random() - 0.5) * Math.min(
+                    platform.width * COLLECTIBLE_LETTER_OFFSET_RATIO, 
+                    COLLECTIBLE_LETTER_MAX_OFFSET
+                );
+                const letterX = platformCenterX + randomOffsetX - COLLECTIBLE_LETTER_SIZE / 2;
+                const letterY = platform.y - COLLECTIBLE_LETTER_SIZE - COLLECTIBLE_LETTER_VERTICAL_OFFSET;
+                
+                letters.push(new Letter(targetWord[i], letterX, letterY, i));
+            }
+            
+            console.log(`Placed ${letters.length} letters to spell: ${targetWord} on reachable platforms`);
         }
 
         // Start the game loop
@@ -1930,6 +2137,8 @@
             cameraBtn.style.display = 'none';
             
             score = 0;
+            wordCompleteBonus = 0;
+            correctOrderBonus = 0;
             startTime = Date.now();
             scoreElement.textContent = score;
             
@@ -1967,19 +2176,65 @@
                 drawDebugOverlay();
             }
 
+            // Update and draw letters (skip collected ones for performance)
+            for (let letter of letters) {
+                if (!letter.collected) {
+                    letter.update();
+                    letter.draw();
+                }
+            }
+
             // Update and draw player
             if (player && !gameWon) {
                 player.update();
                 player.draw();
                 
+                // Check for letter collection
+                for (let letter of letters) {
+                    if (letter.checkCollision(player)) {
+                        letter.collected = true;
+                        collectedLetters.push(letter);
+                        
+                        // Add points for the letter
+                        score += COLLECTIBLE_LETTER_POINTS;
+                        scoreElement.textContent = score;
+                        
+                        console.log(`Collected letter: ${letter.char} (${collectedLetters.length}/${targetWord.length})`);
+                    }
+                }
+                
                 // Check if player reached the goal
                 if (goal && goal.checkCollision(player)) {
+                    // Calculate bonuses if all letters were collected
+                    if (collectedLetters.length === targetWord.length) {
+                        wordCompleteBonus = WORD_COMPLETE_BONUS;
+                        score += wordCompleteBonus;
+                        
+                        // Check if letters were collected in correct order
+                        let correctOrder = true;
+                        for (let i = 0; i < collectedLetters.length; i++) {
+                            if (collectedLetters[i].index !== i) {
+                                correctOrder = false;
+                                break;
+                            }
+                        }
+                        
+                        if (correctOrder) {
+                            correctOrderBonus = CORRECT_ORDER_BONUS;
+                            score += correctOrderBonus;
+                        }
+                        
+                        scoreElement.textContent = score;
+                    }
                     gameWon = true;
                 }
             } else if (player && gameWon) {
                 // Just draw the player when game is won, don't update
                 player.draw();
             }
+
+            // Draw collected letters display
+            drawCollectedLetters();
 
             // Draw win message if game is won
             if (gameWon) {
@@ -2054,18 +2309,111 @@
             ctx.restore();
         }
 
+        // Draw collected letters display at the top of the screen
+        function drawCollectedLetters() {
+            if (letters.length === 0) return;
+            
+            ctx.save();
+            
+            // Draw background panel
+            const panelHeight = 40;
+            const panelY = 10;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(10, panelY, canvas.width - 20, panelHeight);
+            
+            // Draw label
+            ctx.fillStyle = '#FFF';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Collect:', 20, panelY + panelHeight / 2);
+            
+            // Draw target word letters
+            const letterSpacing = 25;
+            const startX = 90;
+            ctx.font = 'bold 18px Arial';
+            ctx.textAlign = 'center';
+            
+            // Create a Set of collected indices for O(1) lookup during rendering
+            const collectedIndices = new Set(collectedLetters.map(l => l.index));
+            
+            for (let i = 0; i < targetWord.length; i++) {
+                const x = startX + i * letterSpacing;
+                const y = panelY + panelHeight / 2;
+                
+                // Check if this letter has been collected
+                const collected = collectedIndices.has(i);
+                
+                // Draw letter circle
+                if (collected) {
+                    ctx.fillStyle = '#FFD700';
+                } else {
+                    ctx.fillStyle = '#555';
+                }
+                ctx.beginPath();
+                ctx.arc(x, y, 10, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw letter
+                ctx.fillStyle = collected ? '#000' : '#AAA';
+                ctx.fillText(targetWord[i], x, y);
+            }
+            
+            // Draw collection progress
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#FFD700';
+            ctx.fillText(`${collectedLetters.length}/${targetWord.length}`, canvas.width - 20, panelY + panelHeight / 2);
+            
+            ctx.restore();
+        }
+
         // Draw win message overlay
         function drawWinMessage() {
+            // Calculate message height based on content
+            let messageHeight = 100;
+            let yOffset = 0;
+            
+            if (collectedLetters.length === targetWord.length) {
+                messageHeight = 180;
+            }
+            
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(0, canvas.height / 2 - 50, canvas.width, 100);
+            ctx.fillRect(0, canvas.height / 2 - messageHeight / 2, canvas.width, messageHeight);
+            
             ctx.fillStyle = '#FFD700';
             ctx.font = 'bold 36px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText('🎉 YOU WIN! 🎉', canvas.width / 2, canvas.height / 2);
+            ctx.fillText('🎉 YOU WIN! 🎉', canvas.width / 2, canvas.height / 2 - 50);
+            
+            // Show word if all letters were collected
+            if (collectedLetters.length === targetWord.length) {
+                ctx.font = 'bold 28px Arial';
+                ctx.fillStyle = '#00FF00';
+                ctx.fillText(`You spelled: ${targetWord}!`, canvas.width / 2, canvas.height / 2 - 15);
+                
+                // Show bonuses
+                ctx.font = '18px Arial';
+                ctx.fillStyle = '#FFF';
+                yOffset = 10;
+                ctx.fillText(`Word Complete Bonus: +${wordCompleteBonus}`, canvas.width / 2, canvas.height / 2 + yOffset);
+                
+                if (correctOrderBonus > 0) {
+                    yOffset += 25;
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fillText(`✨ Correct Order Bonus: +${correctOrderBonus} ✨`, canvas.width / 2, canvas.height / 2 + yOffset);
+                }
+                
+                yOffset += 30;
+            } else {
+                yOffset = 0;
+            }
+            
             ctx.font = '20px Arial';
             ctx.fillStyle = '#FFF';
-            ctx.fillText(`Time: ${Math.floor((Date.now() - startTime) / 1000)}s`, canvas.width / 2, canvas.height / 2 + 30);
-            ctx.fillText('Press ESC or click "Exit Game" to return to start', canvas.width / 2, canvas.height / 2 + 55);
+            ctx.fillText(`Time: ${Math.floor((Date.now() - startTime) / 1000)}s`, canvas.width / 2, canvas.height / 2 + yOffset + 30);
+            ctx.font = '16px Arial';
+            ctx.fillText('Press ESC or click "Exit Game" to return to start', canvas.width / 2, canvas.height / 2 + yOffset + 55);
         }
 
         // Show intro screen
@@ -2109,6 +2457,11 @@
             player = null;
             goal = null;  // Clear goal
             score = 0;
+            letters = [];  // Clear letters
+            collectedLetters = [];  // Clear collected letters
+            targetWord = '';  // Clear target word
+            wordCompleteBonus = 0;
+            correctOrderBonus = 0;
             backgroundImage = null; // Clear background image
             canvas.style.display = 'none';
             gameInfo.style.display = 'none';
