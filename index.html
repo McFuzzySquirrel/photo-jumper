@@ -713,7 +713,7 @@
         const PLATFORM_MIN_WIDTH = 40;  // Must fit at least 2 blocks
         const PLATFORM_THICKNESS = BLOCK_SIZE;  // One block tall
         const PLATFORM_MERGE_GAP_PX = 0;
-        const HELPERS_MAX_COUNT = 30;  // Increased for better reachability with modular blocks
+        const HELPERS_MAX_COUNT = 50;  // Increased from 30 - more helpers for complex photos
 
         const DEBUG_DEFAULT_ENABLED = false;
         
@@ -1969,24 +1969,27 @@
                 }
 
                 // Use smaller, more flexible helper blocks
-                const helperWidthOptions = [BLOCK_SIZE * 3, BLOCK_SIZE * 2];  // 60px, 40px - smaller for tighter spaces
+                const helperWidthOptions = [BLOCK_SIZE * 2, BLOCK_SIZE * 3];  // Try smallest first: 40px, 60px
                 const helperHeight = BLOCK_SIZE;
                 const helperColor = 'rgba(80, 120, 255, 0.9)';
 
                 let current = startPlatform;
                 let added = 0;
                 let failedAttempts = 0;
-                const maxFailedAttempts = 5;
+                const maxFailedAttempts = 10;  // Increased tolerance
 
                 while (added < HELPERS_MAX_COUNT && failedAttempts < maxFailedAttempts) {
-                    if (isReachable(startPlatform, goalPlatform, allPlatforms, limits)) return;
+                    if (isReachable(startPlatform, goalPlatform, allPlatforms, limits)) {
+                        console.log(`Goal is reachable after adding ${added} helper platforms`);
+                        return;
+                    }
 
                     const currentCenter = current.x + current.width / 2;
                     const goalCenter = goalPlatform.x + goalPlatform.width / 2;
 
                     const toward = Math.sign(goalCenter - currentCenter) || 1;
-                    const stepX = limits.maxJumpDx * 0.55;  // Even smaller horizontal steps
-                    const stepUp = limits.maxJumpUp * 0.45;  // Even smaller vertical steps for gradual climb
+                    const stepX = limits.maxJumpDx * 0.5;  // Even smaller horizontal steps - 50% of max
+                    const stepUp = limits.maxJumpUp * 0.4;  // Even smaller vertical steps - 40% of max
 
                     const targetY = Math.max(WORD_BAR_AREA_HEIGHT, current.y - stepUp);
                     
@@ -2011,12 +2014,12 @@
                             debugHelperPlatforms.push(candidate);
                             current = candidate;
                             placed = true;
-                            failedAttempts = 0;  // Reset failed attempts on success
+                            failedAttempts = 0;
                             break;
                         }
                         
-                        // Try shifting left and right with current width
-                        for (let offset = BLOCK_SIZE; offset <= BLOCK_SIZE * 10; offset += BLOCK_SIZE) {
+                        // Try shifting left and right with current width - more aggressive range
+                        for (let offset = BLOCK_SIZE; offset <= BLOCK_SIZE * 15; offset += BLOCK_SIZE) {
                             const leftX = Math.max(0, targetX - offset);
                             const rightX = Math.min(width - helperWidth, targetX + offset);
 
@@ -2044,28 +2047,35 @@
 
                     if (!placed) {
                         // Try stepping horizontally at same height
-                        const horizontalHelper = new Platform(
-                            currentCenter + toward * (BLOCK_SIZE * 3), 
-                            current.y, 
-                            BLOCK_SIZE * 2, 
-                            helperHeight, 
-                            helperColor, 
-                            'helper'
-                        );
-                        
-                        if (!overlapsAny(horizontalHelper, allPlatforms) && 
-                            horizontalHelper.x >= 0 && 
-                            horizontalHelper.x + horizontalHelper.width <= width) {
-                            allPlatforms.push(horizontalHelper);
-                            debugHelperPlatforms.push(horizontalHelper);
-                            current = horizontalHelper;
-                            placed = true;
-                            failedAttempts = 0;
-                        } else {
-                            // Try going down instead of up
+                        for (let stepMultiplier = 2; stepMultiplier <= 5; stepMultiplier++) {
+                            const horizontalHelper = new Platform(
+                                currentCenter + toward * (BLOCK_SIZE * stepMultiplier), 
+                                current.y, 
+                                BLOCK_SIZE * 2, 
+                                helperHeight, 
+                                helperColor, 
+                                'helper'
+                            );
+                            
+                            if (!overlapsAny(horizontalHelper, allPlatforms) && 
+                                horizontalHelper.x >= 0 && 
+                                horizontalHelper.x + horizontalHelper.width <= width) {
+                                allPlatforms.push(horizontalHelper);
+                                debugHelperPlatforms.push(horizontalHelper);
+                                current = horizontalHelper;
+                                placed = true;
+                                failedAttempts = 0;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!placed) {
+                        // Try going down to create descending path
+                        for (let stepMultiplier = 1; stepMultiplier <= 3; stepMultiplier++) {
                             const downHelper = new Platform(
                                 currentCenter + toward * stepX - BLOCK_SIZE,
-                                Math.min(height - helperHeight - 20, current.y + stepUp),
+                                Math.min(height - helperHeight - 20, current.y + (stepUp * stepMultiplier)),
                                 BLOCK_SIZE * 2,
                                 helperHeight,
                                 helperColor,
@@ -2081,39 +2091,57 @@
                                 current = downHelper;
                                 placed = true;
                                 failedAttempts = 0;
-                            } else {
-                                // Last resort: try placing a stepping stone closer to current platform
-                                const closeHelper = new Platform(
-                                    currentCenter + toward * (BLOCK_SIZE * 2),
-                                    current.y - (BLOCK_SIZE * 2),
-                                    BLOCK_SIZE * 2,
-                                    helperHeight,
-                                    helperColor,
-                                    'helper'
-                                );
-                                
-                                if (!overlapsAny(closeHelper, allPlatforms) &&
-                                    closeHelper.x >= 0 &&
-                                    closeHelper.x + closeHelper.width <= width &&
-                                    closeHelper.y >= WORD_BAR_AREA_HEIGHT) {
-                                    allPlatforms.push(closeHelper);
-                                    debugHelperPlatforms.push(closeHelper);
-                                    current = closeHelper;
-                                    placed = true;
-                                    failedAttempts = 0;
-                                } else {
-                                    failedAttempts++;
-                                }
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!placed) {
+                        // Last resort: very small steps in multiple directions
+                        const closeSteps = [
+                            { x: BLOCK_SIZE * 1.5, y: -BLOCK_SIZE * 1.5 },  // diagonal up-forward
+                            { x: BLOCK_SIZE * 2, y: -BLOCK_SIZE },          // forward-up
+                            { x: BLOCK_SIZE * 1, y: -BLOCK_SIZE * 2 },      // up-forward
+                            { x: BLOCK_SIZE * 2, y: 0 },                    // straight forward
+                            { x: BLOCK_SIZE * 1.5, y: BLOCK_SIZE },         // forward-down
+                        ];
+                        
+                        for (const step of closeSteps) {
+                            const closeHelper = new Platform(
+                                currentCenter + (toward * step.x),
+                                current.y + step.y,
+                                BLOCK_SIZE * 2,
+                                helperHeight,
+                                helperColor,
+                                'helper'
+                            );
+                            
+                            if (!overlapsAny(closeHelper, allPlatforms) &&
+                                closeHelper.x >= 0 &&
+                                closeHelper.x + closeHelper.width <= width &&
+                                closeHelper.y >= WORD_BAR_AREA_HEIGHT &&
+                                closeHelper.y + closeHelper.height <= height) {
+                                allPlatforms.push(closeHelper);
+                                debugHelperPlatforms.push(closeHelper);
+                                current = closeHelper;
+                                placed = true;
+                                failedAttempts = 0;
+                                break;
                             }
                         }
                     }
 
                     if (placed) {
                         added++;
+                    } else {
+                        failedAttempts++;
                     }
                 }
                 
                 console.log(`Added ${added} helper platforms (failed attempts: ${failedAttempts})`);
+                if (!isReachable(startPlatform, goalPlatform, allPlatforms, limits)) {
+                    console.warn('⚠️ Warning: Goal may not be reachable even after adding helpers. Try regenerating (G key).');
+                }
             }
 
             // Build grid-based platforms (always run as baseline/fallback)
