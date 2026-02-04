@@ -1485,15 +1485,14 @@
                 if (platformY < 0 || platformY > canvasHeight - PLATFORM_THICKNESS) continue;
                 
                 // All detected objects become solid semi-opaque platforms for smooth gameplay
-                // Use consistent alpha for clear visual feedback
-                const alpha = 0.85;
+                // Use consistent alpha for clear visual feedback (85% opacity)
                 let color;
                 if (detection.isPlatformable) {
                     // Green-tinted for explicitly platformable objects
-                    color = `rgba(60, 150, 80, ${alpha})`;
+                    color = 'rgba(60, 150, 80, 0.85)';
                 } else {
                     // Blue-tinted for other detected objects
-                    color = `rgba(80, 100, 160, ${alpha})`;
+                    color = 'rgba(80, 100, 160, 0.85)';
                 }
                 
                 platformCandidates.push({
@@ -1913,8 +1912,6 @@
                         ).join(', '));
                     }
                     
-                    const platformableDetections = detections.filter(d => d.isPlatformable);
-                    console.log(`${platformableDetections.length} of those are platformable`);
                     
                     // Convert ALL detected objects to platforms for smooth gameplay
                     // This ensures maximum platform coverage and better level traversability
@@ -1926,7 +1923,9 @@
                             new Platform(p.x, p.y, p.width, p.height, p.color, 'ml')
                         );
                         
-                        updateMLStatus(`${detections.length} objects → platforms (${platformableDetections.length} platformable)`);
+                        // Count platformable detections for status display
+                        const platformableCount = detections.filter(d => d.isPlatformable).length;
+                        updateMLStatus(`${detections.length} objects → platforms (${platformableCount} platformable)`);
                     } else {
                         console.log('ℹ️ No objects detected. Try photos with furniture, vehicles, or electronics.');
                         console.log('   Platformable objects: chairs, tables, couches, cars, laptops, etc.');
