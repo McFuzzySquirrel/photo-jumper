@@ -36,6 +36,7 @@ A web-based platform jumping game that converts your photos into playable levels
 ## Features
 
 - 📸 **Photo Upload**: Upload a photo from your device or take one with your camera
+- 🔒 **Privacy First**: All photos are processed entirely in your browser - no uploads, no storage, no transmission to any server
 - 🎨 **Dynamic Level Generation**: Photos are automatically converted into block-based platforms
 - 🧱 **Retro Block Aesthetic**: 16-bit Mario-style modular block platforms with clear collision boundaries
 - 🤖 **ML Object Detection (Experimental)**: Optional ONNX-based detection for 51 object types
