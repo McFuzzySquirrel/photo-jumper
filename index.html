@@ -661,7 +661,7 @@
         const START_AREA_HEIGHT = 100;  // Taller to ensure clear start area
         const GOAL_AREA_WIDTH = 100;
         const GOAL_AREA_HEIGHT = 80;
-        const WORD_BAR_AREA_HEIGHT = 60;  // Reserved area at top for word collection UI
+        const WORD_BAR_AREA_HEIGHT = 30;  // Reduced from 60 to not overlap with score display
         
         // Stuck detection constants
         // Increased to avoid false positives during normal stationary gameplay (planning, waiting)
@@ -1861,22 +1861,24 @@
                 }
 
                 // Use smaller, more flexible helper blocks
-                const helperWidthOptions = [BLOCK_SIZE * 4, BLOCK_SIZE * 3, BLOCK_SIZE * 2];  // 80px, 60px, 40px
+                const helperWidthOptions = [BLOCK_SIZE * 3, BLOCK_SIZE * 2];  // 60px, 40px - smaller for tighter spaces
                 const helperHeight = BLOCK_SIZE;
                 const helperColor = 'rgba(80, 120, 255, 0.9)';
 
                 let current = startPlatform;
                 let added = 0;
+                let failedAttempts = 0;
+                const maxFailedAttempts = 5;
 
-                while (added < HELPERS_MAX_COUNT) {
+                while (added < HELPERS_MAX_COUNT && failedAttempts < maxFailedAttempts) {
                     if (isReachable(startPlatform, goalSupportPlatform, allPlatforms, limits)) return;
 
                     const currentCenter = current.x + current.width / 2;
                     const goalCenter = goalSupportPlatform.x + goalSupportPlatform.width / 2;
 
                     const toward = Math.sign(goalCenter - currentCenter) || 1;
-                    const stepX = limits.maxJumpDx * 0.7;  // More conservative steps
-                    const stepUp = limits.maxJumpUp * 0.6;  // Smaller vertical steps
+                    const stepX = limits.maxJumpDx * 0.6;  // Smaller horizontal steps for more platforms
+                    const stepUp = limits.maxJumpUp * 0.5;  // Smaller vertical steps
 
                     const targetY = Math.max(WORD_BAR_AREA_HEIGHT, current.y - stepUp);
                     
@@ -1901,11 +1903,12 @@
                             debugHelperPlatforms.push(candidate);
                             current = candidate;
                             placed = true;
+                            failedAttempts = 0;  // Reset failed attempts on success
                             break;
                         }
                         
                         // Try shifting left and right with current width
-                        for (let offset = BLOCK_SIZE; offset <= BLOCK_SIZE * 6; offset += BLOCK_SIZE) {
+                        for (let offset = BLOCK_SIZE; offset <= BLOCK_SIZE * 8; offset += BLOCK_SIZE) {
                             const leftX = Math.max(0, targetX - offset);
                             const rightX = Math.min(width - helperWidth, targetX + offset);
 
@@ -1915,6 +1918,7 @@
                                 debugHelperPlatforms.push(leftCandidate);
                                 current = leftCandidate;
                                 placed = true;
+                                failedAttempts = 0;
                                 break;
                             }
 
@@ -1924,15 +1928,16 @@
                                 debugHelperPlatforms.push(rightCandidate);
                                 current = rightCandidate;
                                 placed = true;
+                                failedAttempts = 0;
                                 break;
                             }
                         }
                     }
 
                     if (!placed) {
-                        // If we still can't place, try stepping horizontally instead
+                        // Try stepping horizontally at same height
                         const horizontalHelper = new Platform(
-                            currentCenter + toward * (BLOCK_SIZE * 2), 
+                            currentCenter + toward * (BLOCK_SIZE * 3), 
                             current.y, 
                             BLOCK_SIZE * 2, 
                             helperHeight, 
@@ -1946,13 +1951,40 @@
                             allPlatforms.push(horizontalHelper);
                             debugHelperPlatforms.push(horizontalHelper);
                             current = horizontalHelper;
+                            placed = true;
+                            failedAttempts = 0;
                         } else {
-                            return;  // Give up if we can't place anything
+                            // Try going down instead of up
+                            const downHelper = new Platform(
+                                currentCenter + toward * stepX - BLOCK_SIZE,
+                                Math.min(height - helperHeight - 20, current.y + stepUp),
+                                BLOCK_SIZE * 2,
+                                helperHeight,
+                                helperColor,
+                                'helper'
+                            );
+                            
+                            if (!overlapsAny(downHelper, allPlatforms) &&
+                                downHelper.x >= 0 &&
+                                downHelper.x + downHelper.width <= width &&
+                                downHelper.y >= WORD_BAR_AREA_HEIGHT) {
+                                allPlatforms.push(downHelper);
+                                debugHelperPlatforms.push(downHelper);
+                                current = downHelper;
+                                placed = true;
+                                failedAttempts = 0;
+                            } else {
+                                failedAttempts++;
+                            }
                         }
                     }
 
-                    added++;
+                    if (placed) {
+                        added++;
+                    }
                 }
+                
+                console.log(`Added ${added} helper platforms (failed attempts: ${failedAttempts})`);
             }
 
             // Build grid-based platforms (always run as baseline/fallback)
@@ -2278,14 +2310,7 @@
             // Update camera position
             updateCamera();
 
-            // Save context state
-            ctx.save();
-            
-            // Apply camera transformation
-            ctx.scale(camera.zoom, camera.zoom);
-            ctx.translate(-camera.x, -camera.y);
-
-            // Draw the photo as background instead of solid color
+            // Draw the photo as background (fills viewport, not affected by camera)
             if (backgroundImage) {
                 ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
             } else {
@@ -2293,6 +2318,13 @@
                 ctx.fillStyle = '#87ceeb';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
             }
+
+            // Save context state
+            ctx.save();
+            
+            // Apply camera transformation for game world
+            ctx.scale(camera.zoom, camera.zoom);
+            ctx.translate(-camera.x, -camera.y);
 
             // Update and draw goal
             if (goal) {
