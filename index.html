@@ -374,18 +374,21 @@
             position: fixed;
             inset: 0;
             z-index: 100;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #000;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 10px;
+            padding: 0;
+            margin: 0;
         }
 
         .game-canvas-container.fullscreen #gameCanvas {
-            max-width: 95vw;
-            max-height: 95vh;
-            border-radius: 10px;
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
+            border-radius: 0;
         }
 
         /* Hide non-essential elements when canvas is fullscreen */
@@ -676,6 +679,18 @@
         const CORRECT_ORDER_BONUS = 100;  // Extra bonus for correct order
         const WORD_DICTIONARY = ['JUMP', 'PLAY', 'GAME', 'PHOTO', 'STAR', 'GOAL', 'WIN', 'FUN'];
         const MAX_GOAL_CANDIDATES = 3;  // Number of top goal platform candidates to randomly select from
+        
+        // Camera and viewport constants
+        let camera = {
+            x: 0,
+            y: 0,
+            zoom: 1.0,
+            minZoom: 0.5,
+            maxZoom: 2.0,
+            smoothing: 0.1,  // Camera follow smoothing (0-1, lower = smoother)
+            targetX: 0,
+            targetY: 0
+        };
         
         // Pre-computed shortest word for fallback (safe with non-empty dictionary)
         const SHORTEST_WORD = WORD_DICTIONARY.length > 0 
@@ -2203,7 +2218,7 @@
             gameRunning = true;
             gameWon = false;  // Reset win state
             canvas.style.display = 'block';
-            gameInfo.style.display = 'block';
+            gameInfo.style.display = 'none';  // Hide old game info (we draw it on canvas now)
             resetBtn.style.display = 'inline-block';
             uploadBtn.style.display = 'none';
             cameraBtn.style.display = 'none';
@@ -2212,7 +2227,16 @@
             wordCompleteBonus = 0;
             correctOrderBonus = 0;
             startTime = Date.now();
-            scoreElement.textContent = score;
+            
+            // Reset camera
+            camera.x = 0;
+            camera.y = 0;
+            camera.zoom = 1.0;
+            camera.targetX = 0;
+            camera.targetY = 0;
+            
+            // Resize canvas to fill viewport
+            resizeCanvas();
             
             // Enter fullscreen when game starts
             enterFullscreen();
@@ -2220,9 +2244,46 @@
             gameLoop();
         }
 
+        // Resize canvas to fill viewport
+        function resizeCanvas() {
+            const container = document.querySelector('.game-canvas-container');
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+
+        // Update camera to follow player
+        function updateCamera() {
+            if (!player) return;
+            
+            // Target camera position (center on player)
+            camera.targetX = player.x + player.width / 2 - (canvas.width / camera.zoom) / 2;
+            camera.targetY = player.y + player.height / 2 - (canvas.height / camera.zoom) / 2;
+            
+            // Smooth camera movement
+            camera.x += (camera.targetX - camera.x) * camera.smoothing;
+            camera.y += (camera.targetY - camera.y) * camera.smoothing;
+            
+            // Clamp camera to level bounds
+            const viewportWidth = canvas.width / camera.zoom;
+            const viewportHeight = canvas.height / camera.zoom;
+            camera.x = Math.max(0, Math.min(camera.x, canvas.width - viewportWidth));
+            camera.y = Math.max(0, Math.min(camera.y, canvas.height - viewportHeight));
+        }
+
         // Main game loop
         function gameLoop() {
             if (!gameRunning) return;
+
+            // Update camera position
+            updateCamera();
+
+            // Save context state
+            ctx.save();
+            
+            // Apply camera transformation
+            ctx.scale(camera.zoom, camera.zoom);
+            ctx.translate(-camera.x, -camera.y);
 
             // Draw the photo as background instead of solid color
             if (backgroundImage) {
@@ -2305,6 +2366,12 @@
                 player.draw();
             }
 
+            // Restore context for UI overlay (drawn in screen space, not world space)
+            ctx.restore();
+
+            // Draw game info overlay (score, time)
+            drawGameInfoOverlay();
+
             // Draw collected letters display
             drawCollectedLetters();
 
@@ -2312,12 +2379,62 @@
             if (gameWon) {
                 drawWinMessage();
             }
-
-            // Update time
-            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-            timeElement.textContent = elapsedTime;
+            
+            // Draw zoom level indicator
+            drawZoomIndicator();
 
             requestAnimationFrame(gameLoop);
+        }
+
+        // Draw zoom level indicator
+        function drawZoomIndicator() {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(canvas.width - 80, canvas.height - 40, 70, 30);
+            
+            ctx.fillStyle = '#FFF';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${Math.round(camera.zoom * 100)}%`, canvas.width - 45, canvas.height - 25);
+            ctx.restore();
+        }
+
+        // Draw game info overlay (score, time, controls hint)
+        function drawGameInfoOverlay() {
+            ctx.save();
+            
+            // Top-right corner - Score and Time
+            const infoX = canvas.width - 10;
+            const infoY = 10;
+            
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'top';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.lineWidth = 4;
+            ctx.fillStyle = '#FFD700';
+            
+            const scoreText = `Score: ${score}`;
+            ctx.strokeText(scoreText, infoX, infoY);
+            ctx.fillText(scoreText, infoX, infoY);
+            
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            const timeText = `Time: ${elapsedTime}s`;
+            ctx.strokeText(timeText, infoX, infoY + 22);
+            ctx.fillText(timeText, infoX, infoY + 22);
+            
+            // Bottom-left corner - Controls hint
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            if (!isMobile) {
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                const controlsY = canvas.height - 10;
+                ctx.fillText('Controls: Arrows/Space or A/W/D | Zoom: +/- or Mouse Wheel | R: Respawn', 10, controlsY);
+            }
+            
+            ctx.restore();
         }
 
         function drawDebugOverlay() {
@@ -2835,6 +2952,24 @@
             
             if (shouldIgnoreGameKeyEvent(e)) return;
             
+            // Zoom controls with + and - keys
+            if (e.key === '=' || e.key === '+') {
+                camera.zoom = Math.min(camera.maxZoom, camera.zoom + 0.1);
+                e.preventDefault();
+                return;
+            }
+            if (e.key === '-' || e.key === '_') {
+                camera.zoom = Math.max(camera.minZoom, camera.zoom - 0.1);
+                e.preventDefault();
+                return;
+            }
+            // Reset zoom with '0'
+            if (e.key === '0') {
+                camera.zoom = 1.0;
+                e.preventDefault();
+                return;
+            }
+            
             // Manual respawn with 'R' key
             if ((e.key === 'r' || e.key === 'R') && player && gameRunning) {
                 player.respawn();
@@ -2846,6 +2981,22 @@
             // Prevent default for arrow keys and space
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
                 e.preventDefault();
+            }
+        });
+
+        // Mouse wheel zoom
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (!gameRunning) return;
+            
+            const zoomDelta = e.deltaY > 0 ? -0.1 : 0.1;
+            camera.zoom = Math.max(camera.minZoom, Math.min(camera.maxZoom, camera.zoom + zoomDelta));
+        }, { passive: false });
+
+        // Resize canvas when window resizes
+        window.addEventListener('resize', () => {
+            if (gameRunning) {
+                resizeCanvas();
             }
         });
 
