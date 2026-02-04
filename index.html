@@ -2261,12 +2261,15 @@
             ctx.font = 'bold 18px Arial';
             ctx.textAlign = 'center';
             
+            // Create a Set of collected indices for O(1) lookup
+            const collectedIndices = new Set(collectedLetters.map(l => l.index));
+            
             for (let i = 0; i < targetWord.length; i++) {
                 const x = startX + i * letterSpacing;
                 const y = panelY + panelHeight / 2;
                 
                 // Check if this letter has been collected
-                const collected = collectedLetters.some(l => l.index === i);
+                const collected = collectedIndices.has(i);
                 
                 // Draw letter circle
                 if (collected) {
