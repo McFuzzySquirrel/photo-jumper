@@ -659,7 +659,8 @@
         const GOAL_AREA_HEIGHT = 80;
         
         // Stuck detection constants
-        const STUCK_CHECK_INTERVAL = 5000;  // 5 seconds (increased to avoid false positives during normal stationary gameplay)
+        // Increased to avoid false positives during normal stationary gameplay (planning, waiting)
+        const STUCK_CHECK_INTERVAL = 5000;  // 5 seconds
         const STUCK_MOVEMENT_THRESHOLD = 5;  // pixels
 
         // Letter collection constants
@@ -672,6 +673,7 @@
         const WORD_COMPLETE_BONUS = 50;  // Bonus for collecting all letters
         const CORRECT_ORDER_BONUS = 100;  // Extra bonus for correct order
         const WORD_DICTIONARY = ['JUMP', 'PLAY', 'GAME', 'PHOTO', 'STAR', 'GOAL', 'WIN', 'FUN'];
+        const MAX_GOAL_CANDIDATES = 3;  // Number of top goal platform candidates to randomly select from
         
         // Pre-computed shortest word for fallback (safe with non-empty dictionary)
         const SHORTEST_WORD = WORD_DICTIONARY.length > 0 
@@ -1989,15 +1991,17 @@
                 // Sort by height (higher is better) and distance from start
                 const startCenter = { x: 60, y: startPlatformY };
                 candidateGoalPlatforms.sort((a, b) => {
-                    const aDist = Math.sqrt((a.x - startCenter.x) ** 2 + (a.y - startCenter.y) ** 2);
-                    const bDist = Math.sqrt((b.x - startCenter.x) ** 2 + (b.y - startCenter.y) ** 2);
-                    const aScore = -a.y * 2 + aDist; // Prefer high + far
-                    const bScore = -b.y * 2 + bDist;
+                    // Calculate distance once for each platform
+                    const aDistSq = (a.x - startCenter.x) ** 2 + (a.y - startCenter.y) ** 2;
+                    const bDistSq = (b.x - startCenter.x) ** 2 + (b.y - startCenter.y) ** 2;
+                    // Prefer high (negative y) + far (positive distance)
+                    const aScore = -a.y * 2 + Math.sqrt(aDistSq);
+                    const bScore = -b.y * 2 + Math.sqrt(bDistSq);
                     return bScore - aScore;
                 });
                 
-                // Pick from top 3 candidates randomly for variety
-                const topCandidates = candidateGoalPlatforms.slice(0, Math.min(3, candidateGoalPlatforms.length));
+                // Pick from top candidates randomly for variety
+                const topCandidates = candidateGoalPlatforms.slice(0, Math.min(MAX_GOAL_CANDIDATES, candidateGoalPlatforms.length));
                 const selectedPlatform = topCandidates[Math.floor(Math.random() * topCandidates.length)];
                 
                 goalX = selectedPlatform.x + selectedPlatform.width / 2 - 15;
