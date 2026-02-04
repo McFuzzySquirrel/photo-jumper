@@ -1703,6 +1703,8 @@
 
         // Process image and create platforms
         async function processImage(image) {
+            console.log('processImage called with image:', image.width, 'x', image.height);
+            
             // Store the image for background rendering
             backgroundImage = image;
 
@@ -2998,8 +3000,10 @@
         });
 
         fileInput.addEventListener('change', (e) => {
+            console.log('File input changed');
             const file = e.target.files[0];
             if (file) {
+                console.log('File selected:', file.name, file.type, file.size);
                 // Validate file type
                 if (!file.type.match('image.*')) {
                     alert('Please select a valid image file.');
@@ -3014,14 +3018,20 @@
                 
                 const reader = new FileReader();
                 reader.onload = (event) => {
+                    console.log('FileReader loaded');
                     const img = new Image();
-                    img.onload = () => processImage(img);
+                    img.onload = () => {
+                        console.log('Image loaded, calling processImage');
+                        processImage(img);
+                    };
                     img.onerror = () => {
+                        console.error('Image load error');
                         alert('Failed to load image. Please try a different file.');
                     };
                     img.src = event.target.result;
                 };
                 reader.onerror = () => {
+                    console.error('FileReader error');
                     alert('Failed to read file. Please try again.');
                 };
                 reader.readAsDataURL(file);
