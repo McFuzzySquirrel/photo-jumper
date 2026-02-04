@@ -2310,14 +2310,9 @@
             // Update camera position
             updateCamera();
 
-            // Draw the photo as background (fills viewport, not affected by camera)
-            if (backgroundImage) {
-                ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
-            } else {
-                // Fallback to sky blue if no image
-                ctx.fillStyle = '#87ceeb';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
+            // Clear canvas
+            ctx.fillStyle = '#87ceeb';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // Save context state
             ctx.save();
@@ -2325,6 +2320,11 @@
             // Apply camera transformation for game world
             ctx.scale(camera.zoom, camera.zoom);
             ctx.translate(-camera.x, -camera.y);
+
+            // Draw the photo as background in world space (so it zooms with camera)
+            if (backgroundImage) {
+                ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+            }
 
             // Update and draw goal
             if (goal) {
@@ -2536,23 +2536,30 @@
             
             ctx.save();
             
-            // Draw background panel
-            const panelHeight = 40;
+            // Calculate panel width based on content
+            const letterSpacing = 25;
+            const panelPadding = 20;
+            const labelWidth = 60;
+            const progressWidth = 40;
+            const panelWidth = labelWidth + (targetWord.length * letterSpacing) + progressWidth + panelPadding;
+            
+            // Draw background panel (compact, left-aligned)
+            const panelHeight = 35;
             const panelY = 10;
+            const panelX = 10;
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(10, panelY, canvas.width - 20, panelHeight);
+            ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
             
             // Draw label
             ctx.fillStyle = '#FFF';
-            ctx.font = 'bold 14px Arial';
+            ctx.font = 'bold 13px Arial';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            ctx.fillText('Collect:', 20, panelY + panelHeight / 2);
+            ctx.fillText('Word:', panelX + 10, panelY + panelHeight / 2);
             
             // Draw target word letters
-            const letterSpacing = 25;
-            const startX = 90;
-            ctx.font = 'bold 18px Arial';
+            const startX = panelX + labelWidth;
+            ctx.font = 'bold 16px Arial';
             ctx.textAlign = 'center';
             
             // Create a Set of collected indices for O(1) lookup during rendering
@@ -2572,7 +2579,7 @@
                     ctx.fillStyle = '#555';
                 }
                 ctx.beginPath();
-                ctx.arc(x, y, 10, 0, Math.PI * 2);
+                ctx.arc(x, y, 9, 0, Math.PI * 2);
                 ctx.fill();
                 
                 // Draw letter
@@ -2581,10 +2588,10 @@
             }
             
             // Draw collection progress
-            ctx.font = '14px Arial';
+            ctx.font = '12px Arial';
             ctx.textAlign = 'right';
             ctx.fillStyle = '#FFD700';
-            ctx.fillText(`${collectedLetters.length}/${targetWord.length}`, canvas.width - 20, panelY + panelHeight / 2);
+            ctx.fillText(`${collectedLetters.length}/${targetWord.length}`, panelX + panelWidth - 10, panelY + panelHeight / 2);
             
             ctx.restore();
         }
