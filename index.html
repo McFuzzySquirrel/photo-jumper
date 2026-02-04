@@ -1028,8 +1028,8 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.width = 0;   // No separate goal object
-                this.height = 0;  // Goal is just the glowing platform
+                this.width = BLOCK_SIZE;   // Portal is one block wide
+                this.height = BLOCK_SIZE * 2;  // Portal is 2 blocks tall
                 this.animation = 0;
             }
 
@@ -1038,12 +1038,49 @@
             }
 
             checkCollision(player) {
-                // Collision is handled by the goal platform itself
-                return false;
+                // Check if player overlaps with the portal
+                return player.x < this.x + this.width &&
+                       player.x + player.width > this.x &&
+                       player.y < this.y + this.height &&
+                       player.y + player.height > this.y;
             }
 
             draw() {
-                // Goal is drawn as part of the platform - nothing to draw here
+                // Draw portal as shimmering gateway
+                ctx.save();
+                
+                const glowIntensity = 0.7 + Math.sin(this.animation * 2) * 0.3;
+                
+                // Outer glow
+                ctx.shadowColor = '#FFD700';
+                ctx.shadowBlur = 20 * glowIntensity;
+                
+                // Portal gradient (vertical)
+                const gradient = ctx.createLinearGradient(
+                    this.x, this.y,
+                    this.x, this.y + this.height
+                );
+                gradient.addColorStop(0, 'rgba(255, 215, 0, 0.3)');
+                gradient.addColorStop(0.5, 'rgba(255, 215, 0, 0.8)');
+                gradient.addColorStop(1, 'rgba(255, 165, 0, 0.3)');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                
+                // Portal frame/border
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+                
+                // Sparkle particles
+                ctx.shadowBlur = 0;
+                for (let i = 0; i < 3; i++) {
+                    const sparkleY = this.y + (Math.sin(this.animation * 3 + i * 2) + 1) * this.height / 2;
+                    ctx.fillStyle = `rgba(255, 255, 255, ${glowIntensity})`;
+                    ctx.fillRect(this.x + this.width / 2 - 1, sparkleY, 2, 2);
+                }
+                
+                ctx.restore();
             }
         }
 
@@ -1924,8 +1961,8 @@
             
             // Remove platforms that are stacked too closely vertically
             function filterVerticallyClashingPlatforms(platforms) {
-                // Minimum gap should accommodate player height (20px) plus jump clearance
-                const minVerticalGap = PLAYER_SIZE + 10;  // 30px - enough to jump through and drop down
+                // Minimum gap should be player width (20px) plus clearance for comfortable passage
+                const minVerticalGap = PLAYER_SIZE + 15;  // 35px - comfortably fits 20px player with margin
                 const filtered = [];
                 
                 // Sort by Y position
@@ -2279,7 +2316,12 @@
             }
             
             platforms.push(goalPlatform);
-            goal = new Goal(0, 0);  // Just for animation tracking
+            
+            // Create portal on top of goal platform
+            goal = new Goal(
+                goalPlatform.x + (goalPlatform.width / 2) - (BLOCK_SIZE / 2),  // Center on platform
+                goalPlatform.y - (BLOCK_SIZE * 2)  // 2 blocks tall, sits on top
+            );
             
             console.log('Goal platform created:', {
                 x: goalPlatform.x,
@@ -2287,6 +2329,12 @@
                 width: goalPlatform.width,
                 height: goalPlatform.height,
                 kind: goalPlatform.kind
+            });
+            console.log('Goal portal created:', {
+                x: goal.x,
+                y: goal.y,
+                width: goal.width,
+                height: goal.height
             });
 
             // Initialize player ON the start platform (not above it)
@@ -2537,13 +2585,13 @@
                     }
                 }
                 
-                // Check if player reached the goal platform
-                if (goalPlatform) {
-                    const collision = player.checkCollision(goalPlatform);
+                // Check if player reached the goal portal
+                if (goal) {
+                    const collision = goal.checkCollision(player);
                     if (collision) {
-                        console.log('Player reached goal platform!');
+                        console.log('Player reached goal portal!');
                         console.log('Player:', { x: player.x, y: player.y, width: player.width, height: player.height });
-                        console.log('Goal Platform:', { x: goalPlatform.x, y: goalPlatform.y, width: goalPlatform.width, height: goalPlatform.height });
+                        console.log('Goal Portal:', { x: goal.x, y: goal.y, width: goal.width, height: goal.height });
                         // Calculate bonuses if all letters were collected
                         if (collectedLetters.length === targetWord.length) {
                             wordCompleteBonus = WORD_COMPLETE_BONUS;
@@ -2569,7 +2617,7 @@
                         console.log('Game won set to true');
                     }
                 } else {
-                    console.warn('goalPlatform is null!');
+                    console.warn('goal is null!');
                 }
             } else if (player && gameWon) {
                 // Just draw the player when game is won, don't update
