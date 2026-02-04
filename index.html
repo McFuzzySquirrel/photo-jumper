@@ -1015,45 +1015,25 @@
             }
 
             draw() {
-                // 16-bit block style rendering
+                // Draw shadow for depth
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.fillRect(this.x + 2, this.y + 2, this.width, this.height);
                 
-                // Draw shadow for depth (offset slightly)
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-                ctx.fillRect(this.x + 3, this.y + 3, this.width, this.height);
-                
-                // Draw main block fill
+                // Draw main platform fill
                 ctx.fillStyle = this.color;
                 ctx.fillRect(this.x, this.y, this.width, this.height);
                 
-                // Add highlight on top-left for 3D block effect
-                const highlightGradient = ctx.createLinearGradient(
-                    this.x, this.y, 
-                    this.x + this.width, this.y + this.height
-                );
-                highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
-                highlightGradient.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
-                ctx.fillStyle = highlightGradient;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
-                
-                // Draw thick black outline for pixel-art style
+                // Draw thick black outline for visibility
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 3;
                 ctx.strokeRect(this.x, this.y, this.width, this.height);
                 
-                // Add bright top edge highlight for classic platform look
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                // Add highlight on top edge for 3D effect
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.moveTo(this.x + 1, this.y + 1);
                 ctx.lineTo(this.x + this.width - 1, this.y + 1);
-                ctx.stroke();
-                
-                // Add dark bottom edge for depth
-                ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(this.x + 1, this.y + this.height - 1);
-                ctx.lineTo(this.x + this.width - 1, this.y + this.height - 1);
                 ctx.stroke();
             }
         }
@@ -1471,19 +1451,19 @@
             return unionArea > 0 ? interArea / unionArea : 0;
         }
 
-        // Map detected objects to filled block platforms (16-bit style)
+        // Map detected objects to platform surfaces (top-edge for standing)
         function mapObjectsToPlatforms(detections, canvasWidth, canvasHeight) {
             const platformCandidates = [];
             
             for (const detection of detections) {
                 const [x, y, w, h] = detection.bbox;
                 
-                // Fill the ENTIRE detected object area as a solid block
-                // This creates a 16-bit platformer look and ensures reachability
+                // Use TOP edge as platform surface with moderate thickness
+                // This allows standing on objects while keeping clear air space
                 const platformY = y;
                 const platformX = x;
                 const platformWidth = w;
-                const platformHeight = h;  // Use full height instead of thin platform
+                const platformHeight = Math.min(h * 0.25, 30);  // Use 25% of height or 30px max
                 
                 // Skip if platform would be in reserved areas
                 const isStartArea = (platformX < START_AREA_WIDTH && platformY > canvasHeight - START_AREA_HEIGHT);
@@ -1495,31 +1475,29 @@
                 if (platformWidth < PLATFORM_MIN_WIDTH) continue;
                 
                 // Skip if platform is outside canvas bounds
-                if (platformY < 0 || platformY > canvasHeight) continue;
+                if (platformY < 0 || platformY > canvasHeight - platformHeight) continue;
                 
-                // Filled blocks with semi-transparent color for retro look
+                // Semi-transparent platforms that show the photo underneath
                 let color;
                 if (detection.isPlatformable) {
-                    // Green blocks for platformable objects
-                    color = 'rgba(60, 150, 80, 0.75)';
+                    color = 'rgba(60, 150, 80, 0.85)';
                 } else {
-                    // Blue blocks for other detected objects
-                    color = 'rgba(80, 100, 160, 0.75)';
+                    color = 'rgba(80, 100, 160, 0.85)';
                 }
                 
                 platformCandidates.push({
                     x: platformX,
                     y: platformY,
                     width: platformWidth,
-                    height: platformHeight,  // Full height for block style
+                    height: platformHeight,
                     color: color,
                     source: 'ml-detection',
                     detection: detection
                 });
             }
             
-            // Don't merge - keep each object as a distinct block
-            return platformCandidates;
+            // Merge nearby platforms to reduce clutter
+            return mergePlatformCandidates(platformCandidates);
         }
 
         // Merge platform candidates that are on similar Y levels and close horizontally
@@ -1769,83 +1747,62 @@
 
             function extractTopSurfacesFromGrid(grid) {
                 const { solid, brightness, cellsX, cellsY } = grid;
-                
-                // Extract filled rectangular regions (flood-fill style)
-                const blocks = [];
-                const visited = Array.from({ length: cellsY }, () => Array(cellsX).fill(false));
+                const segments = [];
 
+                // Extract top surfaces only - keep air space clear for navigation
                 for (let cy = 0; cy < cellsY; cy++) {
                     for (let cx = 0; cx < cellsX; cx++) {
-                        if (!solid[cy][cx] || visited[cy][cx]) continue;
-                        
-                        // Find the rectangular block starting from this cell
-                        // First, extend horizontally as far as possible
-                        let endX = cx;
-                        while (endX < cellsX && solid[cy][endX] && !visited[cy][endX]) {
-                            endX++;
-                        }
-                        const blockWidth = endX - cx;
-                        
-                        // Then extend vertically as far as possible while maintaining width
-                        let endY = cy;
-                        let canExtend = true;
-                        while (endY < cellsY && canExtend) {
-                            for (let x = cx; x < endX; x++) {
-                                if (!solid[endY][x] || visited[endY][x]) {
-                                    canExtend = false;
-                                    break;
-                                }
-                            }
-                            if (canExtend) endY++;
-                        }
-                        const blockHeight = endY - cy;
-                        
-                        // Mark all cells in this block as visited
-                        for (let y = cy; y < endY; y++) {
-                            for (let x = cx; x < endX; x++) {
-                                visited[y][x] = true;
-                            }
-                        }
-                        
-                        // Calculate average brightness for this block
-                        let totalBrightness = 0;
-                        let count = 0;
-                        for (let y = cy; y < endY; y++) {
-                            for (let x = cx; x < endX; x++) {
-                                totalBrightness += brightness[y][x];
-                                count++;
-                            }
-                        }
-                        const avgBrightness = totalBrightness / count;
-                        
-                        blocks.push({
-                            x: cx * gridSize,
-                            y: cy * gridSize,
-                            width: blockWidth * gridSize,
-                            height: blockHeight * gridSize,
-                            brightness: avgBrightness
+                        if (!solid[cy][cx]) continue;
+                        const aboveSolid = (cy > 0) ? solid[cy - 1][cx] : false;
+                        if (aboveSolid) continue;
+
+                        const x = cx * gridSize;
+                        const y = cy * gridSize;
+                        const w = Math.min(gridSize, width - x);
+                        if (w <= 0) continue;
+
+                        segments.push({
+                            x,
+                            y,
+                            width: w,
+                            brightness: brightness[cy][cx]
                         });
                     }
                 }
 
-                // Convert to platform objects, enforcing minimum dimensions
+                // Merge adjacent segments on the same y into longer platforms
+                const merged = [];
+                let current = null;
+
+                for (const seg of segments) {
+                    if (!current) {
+                        current = { ...seg };
+                        continue;
+                    }
+
+                    const touchesSameRow = seg.y === current.y;
+                    const isAdjacent = seg.x <= (current.x + current.width + PLATFORM_MERGE_GAP_PX);
+
+                    if (touchesSameRow && isAdjacent) {
+                        const end = Math.max(current.x + current.width, seg.x + seg.width);
+                        const totalWidth = end - current.x;
+                        const weightedBrightness = ((current.brightness * current.width) + (seg.brightness * seg.width)) / (current.width + seg.width);
+                        current.width = totalWidth;
+                        current.brightness = weightedBrightness;
+                    } else {
+                        merged.push(current);
+                        current = { ...seg };
+                    }
+                }
+                if (current) merged.push(current);
+
+                // Convert to platform objects with moderate thickness for visibility
                 const platformsOut = [];
-                for (const block of blocks) {
-                    // Ensure minimum width
-                    if (block.width < PLATFORM_MIN_WIDTH) continue;
-                    
-                    // Ensure minimum height (at least one grid cell)
-                    const finalHeight = Math.max(block.height, gridSize);
-                    
-                    const color = platformColorFromBrightness(block.brightness);
-                    platformsOut.push(new Platform(
-                        block.x, 
-                        block.y, 
-                        Math.min(block.width, width - block.x), 
-                        Math.min(finalHeight, height - block.y), 
-                        color, 
-                        'photo'
-                    ));
+                for (const m of merged) {
+                    if (m.width < PLATFORM_MIN_WIDTH) continue;
+                    const platformHeight = Math.max(PLATFORM_THICKNESS, gridSize);  // At least gridSize thick
+                    const color = platformColorFromBrightness(m.brightness);
+                    platformsOut.push(new Platform(m.x, m.y, m.width, platformHeight, color, 'photo'));
                 }
 
                 return platformsOut;
@@ -1857,7 +1814,7 @@
                 }
 
                 const helperWidth = Math.max(PLATFORM_MIN_WIDTH * 2, 80);
-                const helperHeight = gridSize * 2;  // Block-style height
+                const helperHeight = PLATFORM_THICKNESS;  // Keep thin for clear navigation
                 const helperColor = 'rgba(80, 120, 255, 0.9)';
 
                 let current = startPlatform;
@@ -1870,14 +1827,13 @@
                     const goalCenter = goalSupportPlatform.x + goalSupportPlatform.width / 2;
 
                     const toward = Math.sign(goalCenter - currentCenter) || 1;
-                    const stepX = limits.maxJumpDx * 0.8;  // Increased from 0.7 for bigger jumps
-                    const stepUp = limits.maxJumpUp * 0.8; // Increased from 0.7 for bigger vertical steps
+                    const stepX = limits.maxJumpDx * 0.8;
+                    const stepUp = limits.maxJumpUp * 0.8;
 
                     const targetY = Math.max(WORD_BAR_AREA_HEIGHT, current.y - stepUp);
                     const idealX = currentCenter + toward * stepX - (helperWidth / 2);
                     let targetX = Math.max(0, Math.min(width - helperWidth, idealX));
 
-                    // Avoid placing helpers inside the goal reserved area.
                     const wouldBeInGoalArea = (targetX > width - GOAL_AREA_WIDTH && targetY < GOAL_AREA_HEIGHT);
                     if (wouldBeInGoalArea) {
                         targetX = Math.max(0, width - GOAL_AREA_WIDTH - helperWidth - 10);
@@ -1885,7 +1841,6 @@
 
                     const candidate = new Platform(targetX, targetY, helperWidth, helperHeight, helperColor, 'helper');
 
-                    // Deterministically search nearby x positions if we collide with existing geometry.
                     if (overlapsAny(candidate, allPlatforms)) {
                         let placed = false;
                         for (let offset = gridSize; offset <= gridSize * 8; offset += gridSize) {
@@ -1912,7 +1867,6 @@
                         }
 
                         if (!placed) {
-                            // If we can't find a non-overlapping spot, stop adding helpers.
                             return;
                         }
                     } else {
@@ -2005,9 +1959,9 @@
             // Add a ground platform at the bottom (darker and more opaque)
             platforms.push(new Platform(0, height - 20, width, 20, 'rgba(100, 60, 20, 0.8)', 'ground'));
 
-            // Add starting platform (green block to indicate start, larger and clearer)
+            // Add starting platform (green to indicate start)
             const startPlatformY = height - 60;
-            const startPlatform = new Platform(10, startPlatformY, 100, 40, 'rgba(0, 180, 0, 0.9)', 'start');
+            const startPlatform = new Platform(10, startPlatformY, 100, 20, 'rgba(0, 180, 0, 0.9)', 'start');
             platforms.push(startPlatform);
 
             // Randomly select a goal location from suitable platforms
@@ -2048,7 +2002,7 @@
                 goalSupportPlatform = new Platform(
                     selectedPlatform.x + selectedPlatform.width / 2 - 25,
                     selectedPlatform.y - 20,
-                    50, 30, 
+                    50, 20, 
                     'rgba(255, 200, 0, 0.9)', 
                     'goal'
                 );
@@ -2056,7 +2010,7 @@
                 // Fallback to top-right if no suitable platforms found
                 goalX = width - 50;
                 goalY = 20;
-                goalSupportPlatform = new Platform(goalX - 10, goalY + 30, 50, 30, 'rgba(255, 200, 0, 0.9)', 'goal');
+                goalSupportPlatform = new Platform(goalX - 10, goalY + 30, 50, 20, 'rgba(255, 200, 0, 0.9)', 'goal');
             }
             
             platforms.push(goalSupportPlatform);
