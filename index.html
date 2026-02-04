@@ -662,6 +662,13 @@
         const STUCK_CHECK_INTERVAL = 3000;  // 3 seconds
         const STUCK_MOVEMENT_THRESHOLD = 5;  // pixels
 
+        // Letter collection constants
+        const LETTER_SIZE = 20;
+        const LETTER_POINTS = 10;  // Points per letter
+        const WORD_COMPLETE_BONUS = 50;  // Bonus for collecting all letters
+        const CORRECT_ORDER_BONUS = 100;  // Extra bonus for correct order
+        const WORD_DICTIONARY = ['JUMP', 'PLAY', 'GAME', 'PHOTO', 'STAR', 'GOAL', 'WIN', 'FUN'];
+
         let gameRunning = false;
         let platforms = [];
         let player = null;
@@ -675,6 +682,13 @@
         let touchJumping = false;
         let backgroundImage = null; // Store the uploaded photo for background
         let gameWon = false;  // Track if player reached the goal
+
+        // Letter collection game state
+        let letters = [];  // Array of Letter objects
+        let collectedLetters = [];  // Array of collected letters in order
+        let targetWord = '';  // The word to spell
+        let wordCompleteBonus = 0;  // Bonus earned for completing word
+        let correctOrderBonus = 0;  // Bonus earned for correct order
 
         let debugOverlayEnabled = DEBUG_DEFAULT_ENABLED;
         let debugSolidGrid = null;
@@ -1014,6 +1028,67 @@
                 ctx.moveTo(this.x, this.y + 1);
                 ctx.lineTo(this.x + this.width, this.y + 1);
                 ctx.stroke();
+            }
+        }
+
+        // Letter class for collectible letters
+        class Letter {
+            constructor(char, x, y, index) {
+                this.char = char;
+                this.x = x;
+                this.y = y;
+                this.width = LETTER_SIZE;
+                this.height = LETTER_SIZE;
+                this.collected = false;
+                this.index = index;  // Position in the target word
+                this.animation = 0;
+            }
+
+            update() {
+                this.animation += 0.1;
+            }
+
+            checkCollision(player) {
+                return !this.collected &&
+                       player.x < this.x + this.width &&
+                       player.x + player.width > this.x &&
+                       player.y < this.y + this.height &&
+                       player.y + player.height > this.y;
+            }
+
+            draw() {
+                if (this.collected) return;
+
+                // Floating animation
+                const floatOffset = Math.sin(this.animation) * 3;
+                const centerX = this.x + this.width / 2;
+                const centerY = this.y + this.height / 2 + floatOffset;
+
+                // Draw circular background with glow
+                ctx.shadowColor = 'rgba(255, 215, 0, 0.8)';
+                ctx.shadowBlur = 10;
+                ctx.fillStyle = '#FFD700';
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, LETTER_SIZE / 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Reset shadow
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+
+                // Draw black outline
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, LETTER_SIZE / 2, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // Draw the letter
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(this.char, centerX, centerY);
             }
         }
 
@@ -1915,8 +1990,49 @@
             const limits = getJumpLimits();
             addHelperPlatformsIfNeeded(startPlatform, goalSupportPlatform, platforms, limits);
 
+            // Place collectible letters on platforms
+            placeLettersOnPlatforms();
+
             // Start game
             startGame();
+        }
+
+        // Place letters on platforms to spell a word
+        function placeLettersOnPlatforms() {
+            letters = [];
+            collectedLetters = [];
+            
+            // Choose a random word from the dictionary
+            targetWord = WORD_DICTIONARY[Math.floor(Math.random() * WORD_DICTIONARY.length)];
+            
+            // Get platforms that are suitable for letter placement
+            // Exclude ground, start, and goal platforms
+            const suitablePlatforms = platforms.filter(p => 
+                p.kind === 'photo' || p.kind === 'ml' || p.kind === 'helper'
+            );
+            
+            if (suitablePlatforms.length === 0) {
+                console.warn('No suitable platforms for letter placement');
+                return;
+            }
+            
+            // Shuffle platforms to randomize letter placement
+            const shuffledPlatforms = [...suitablePlatforms].sort(() => Math.random() - 0.5);
+            
+            // Place each letter of the word on different platforms
+            for (let i = 0; i < targetWord.length; i++) {
+                const platform = shuffledPlatforms[i % shuffledPlatforms.length];
+                
+                // Place letter on top of platform, centered with some randomness
+                const platformCenterX = platform.x + platform.width / 2;
+                const randomOffsetX = (Math.random() - 0.5) * Math.min(platform.width * 0.4, 30);
+                const letterX = platformCenterX + randomOffsetX - LETTER_SIZE / 2;
+                const letterY = platform.y - LETTER_SIZE - 10;  // 10px above platform
+                
+                letters.push(new Letter(targetWord[i], letterX, letterY, i));
+            }
+            
+            console.log(`Placed ${letters.length} letters to spell: ${targetWord}`);
         }
 
         // Start the game loop
@@ -1930,6 +2046,8 @@
             cameraBtn.style.display = 'none';
             
             score = 0;
+            wordCompleteBonus = 0;
+            correctOrderBonus = 0;
             startTime = Date.now();
             scoreElement.textContent = score;
             
@@ -1967,19 +2085,63 @@
                 drawDebugOverlay();
             }
 
+            // Update and draw letters
+            for (let letter of letters) {
+                letter.update();
+                letter.draw();
+            }
+
             // Update and draw player
             if (player && !gameWon) {
                 player.update();
                 player.draw();
                 
+                // Check for letter collection
+                for (let letter of letters) {
+                    if (letter.checkCollision(player)) {
+                        letter.collected = true;
+                        collectedLetters.push(letter);
+                        
+                        // Add points for the letter
+                        score += LETTER_POINTS;
+                        scoreElement.textContent = score;
+                        
+                        console.log(`Collected letter: ${letter.char} (${collectedLetters.length}/${targetWord.length})`);
+                    }
+                }
+                
                 // Check if player reached the goal
                 if (goal && goal.checkCollision(player)) {
+                    // Calculate bonuses if all letters were collected
+                    if (collectedLetters.length === targetWord.length) {
+                        wordCompleteBonus = WORD_COMPLETE_BONUS;
+                        score += wordCompleteBonus;
+                        
+                        // Check if letters were collected in correct order
+                        let correctOrder = true;
+                        for (let i = 0; i < collectedLetters.length; i++) {
+                            if (collectedLetters[i].index !== i) {
+                                correctOrder = false;
+                                break;
+                            }
+                        }
+                        
+                        if (correctOrder) {
+                            correctOrderBonus = CORRECT_ORDER_BONUS;
+                            score += correctOrderBonus;
+                        }
+                        
+                        scoreElement.textContent = score;
+                    }
                     gameWon = true;
                 }
             } else if (player && gameWon) {
                 // Just draw the player when game is won, don't update
                 player.draw();
             }
+
+            // Draw collected letters display
+            drawCollectedLetters();
 
             // Draw win message if game is won
             if (gameWon) {
@@ -2054,18 +2216,108 @@
             ctx.restore();
         }
 
+        // Draw collected letters display at the top of the screen
+        function drawCollectedLetters() {
+            if (letters.length === 0) return;
+            
+            ctx.save();
+            
+            // Draw background panel
+            const panelHeight = 40;
+            const panelY = 10;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(10, panelY, canvas.width - 20, panelHeight);
+            
+            // Draw label
+            ctx.fillStyle = '#FFF';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Collect:', 20, panelY + panelHeight / 2);
+            
+            // Draw target word letters
+            const letterSpacing = 25;
+            const startX = 90;
+            ctx.font = 'bold 18px Arial';
+            ctx.textAlign = 'center';
+            
+            for (let i = 0; i < targetWord.length; i++) {
+                const x = startX + i * letterSpacing;
+                const y = panelY + panelHeight / 2;
+                
+                // Check if this letter has been collected
+                const collected = collectedLetters.some(l => l.index === i);
+                
+                // Draw letter circle
+                if (collected) {
+                    ctx.fillStyle = '#FFD700';
+                } else {
+                    ctx.fillStyle = '#555';
+                }
+                ctx.beginPath();
+                ctx.arc(x, y, 10, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw letter
+                ctx.fillStyle = collected ? '#000' : '#AAA';
+                ctx.fillText(targetWord[i], x, y);
+            }
+            
+            // Draw collection progress
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillStyle = '#FFD700';
+            ctx.fillText(`${collectedLetters.length}/${targetWord.length}`, canvas.width - 20, panelY + panelHeight / 2);
+            
+            ctx.restore();
+        }
+
         // Draw win message overlay
         function drawWinMessage() {
+            // Calculate message height based on content
+            let messageHeight = 100;
+            let yOffset = 0;
+            
+            if (collectedLetters.length === targetWord.length) {
+                messageHeight = 180;
+            }
+            
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(0, canvas.height / 2 - 50, canvas.width, 100);
+            ctx.fillRect(0, canvas.height / 2 - messageHeight / 2, canvas.width, messageHeight);
+            
             ctx.fillStyle = '#FFD700';
             ctx.font = 'bold 36px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText('🎉 YOU WIN! 🎉', canvas.width / 2, canvas.height / 2);
+            ctx.fillText('🎉 YOU WIN! 🎉', canvas.width / 2, canvas.height / 2 - 50);
+            
+            // Show word if all letters were collected
+            if (collectedLetters.length === targetWord.length) {
+                ctx.font = 'bold 28px Arial';
+                ctx.fillStyle = '#00FF00';
+                ctx.fillText(`You spelled: ${targetWord}!`, canvas.width / 2, canvas.height / 2 - 15);
+                
+                // Show bonuses
+                ctx.font = '18px Arial';
+                ctx.fillStyle = '#FFF';
+                yOffset = 10;
+                ctx.fillText(`Word Complete Bonus: +${wordCompleteBonus}`, canvas.width / 2, canvas.height / 2 + yOffset);
+                
+                if (correctOrderBonus > 0) {
+                    yOffset += 25;
+                    ctx.fillStyle = '#FFD700';
+                    ctx.fillText(`✨ Correct Order Bonus: +${correctOrderBonus} ✨`, canvas.width / 2, canvas.height / 2 + yOffset);
+                }
+                
+                yOffset += 30;
+            } else {
+                yOffset = 0;
+            }
+            
             ctx.font = '20px Arial';
             ctx.fillStyle = '#FFF';
-            ctx.fillText(`Time: ${Math.floor((Date.now() - startTime) / 1000)}s`, canvas.width / 2, canvas.height / 2 + 30);
-            ctx.fillText('Press ESC or click "Exit Game" to return to start', canvas.width / 2, canvas.height / 2 + 55);
+            ctx.fillText(`Time: ${Math.floor((Date.now() - startTime) / 1000)}s`, canvas.width / 2, canvas.height / 2 + yOffset + 30);
+            ctx.font = '16px Arial';
+            ctx.fillText('Press ESC or click "Exit Game" to return to start', canvas.width / 2, canvas.height / 2 + yOffset + 55);
         }
 
         // Show intro screen
@@ -2109,6 +2361,11 @@
             player = null;
             goal = null;  // Clear goal
             score = 0;
+            letters = [];  // Clear letters
+            collectedLetters = [];  // Clear collected letters
+            targetWord = '';  // Clear target word
+            wordCompleteBonus = 0;
+            correctOrderBonus = 0;
             backgroundImage = null; // Clear background image
             canvas.style.display = 'none';
             gameInfo.style.display = 'none';
