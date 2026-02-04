@@ -1924,7 +1924,8 @@
             
             // Remove platforms that are stacked too closely vertically
             function filterVerticallyClashingPlatforms(platforms) {
-                const minVerticalGap = BLOCK_SIZE;  // At least 1 block spacing
+                // Minimum gap should accommodate player height (20px) plus jump clearance
+                const minVerticalGap = PLAYER_SIZE + 10;  // 30px - enough to jump through and drop down
                 const filtered = [];
                 
                 // Sort by Y position
@@ -1944,8 +1945,9 @@
                         if (horizontalOverlap) {
                             const verticalGap = below.y - (current.y + current.height);
                             
-                            if (verticalGap < minVerticalGap) {
+                            if (verticalGap > 0 && verticalGap < minVerticalGap) {
                                 tooClose = true;
+                                console.log(`Filtering platform at y=${current.y} - too close to platform at y=${below.y} (gap=${verticalGap}px < ${minVerticalGap}px)`);
                                 break;
                             }
                             // Once we find the first platform below with overlap, we can stop checking
@@ -2501,6 +2503,7 @@
                 
                 // Check if player reached the goal platform
                 if (goalPlatform && player.checkCollision(goalPlatform)) {
+                    console.log('Player reached goal platform!');
                     // Calculate bonuses if all letters were collected
                     if (collectedLetters.length === targetWord.length) {
                         wordCompleteBonus = WORD_COMPLETE_BONUS;
@@ -2523,6 +2526,7 @@
                         scoreElement.textContent = score;
                     }
                     gameWon = true;
+                    console.log('Game won set to true');
                 }
             } else if (player && gameWon) {
                 // Just draw the player when game is won, don't update
