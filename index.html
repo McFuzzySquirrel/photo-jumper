@@ -1968,11 +1968,53 @@
             const startPlatform = new Platform(10, startPlatformY, 100, 20, 'rgba(0, 180, 0, 0.9)', 'start');
             platforms.push(startPlatform);
 
-            // Add goal at top-right corner of the level
-            const goalX = width - 50;
-            const goalY = 20;
-            // Add a platform for the goal to sit on (golden and more visible)
-            const goalSupportPlatform = new Platform(goalX - 10, goalY + 30, 50, 20, 'rgba(255, 200, 0, 0.9)', 'goal');
+            // Randomly select a goal location from suitable platforms
+            // Goal should be: reachable, sufficiently far from start, preferably high up
+            let goalSupportPlatform = null;
+            let goalX, goalY;
+            
+            // Get candidate platforms for goal placement (photo/ml platforms in upper half)
+            const candidateGoalPlatforms = platforms.filter(p => {
+                if (p.kind !== 'photo' && p.kind !== 'ml') return false;
+                // Prefer upper 60% of the level
+                if (p.y > height * 0.6) return false;
+                // Must not overlap with start area
+                if (p.x < 150 && p.y > height - 150) return false;
+                return true;
+            });
+            
+            // If we have suitable candidates, pick one randomly
+            if (candidateGoalPlatforms.length > 0) {
+                // Sort by height (higher is better) and distance from start
+                const startCenter = { x: 60, y: startPlatformY };
+                candidateGoalPlatforms.sort((a, b) => {
+                    const aDist = Math.sqrt((a.x - startCenter.x) ** 2 + (a.y - startCenter.y) ** 2);
+                    const bDist = Math.sqrt((b.x - startCenter.x) ** 2 + (b.y - startCenter.y) ** 2);
+                    const aScore = -a.y * 2 + aDist; // Prefer high + far
+                    const bScore = -b.y * 2 + bDist;
+                    return bScore - aScore;
+                });
+                
+                // Pick from top 3 candidates randomly for variety
+                const topCandidates = candidateGoalPlatforms.slice(0, Math.min(3, candidateGoalPlatforms.length));
+                const selectedPlatform = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+                
+                goalX = selectedPlatform.x + selectedPlatform.width / 2 - 15;
+                goalY = selectedPlatform.y - 40; // Above the platform
+                goalSupportPlatform = new Platform(
+                    selectedPlatform.x + selectedPlatform.width / 2 - 25,
+                    selectedPlatform.y - 20,
+                    50, 20, 
+                    'rgba(255, 200, 0, 0.9)', 
+                    'goal'
+                );
+            } else {
+                // Fallback to top-right if no suitable platforms found
+                goalX = width - 50;
+                goalY = 20;
+                goalSupportPlatform = new Platform(goalX - 10, goalY + 30, 50, 20, 'rgba(255, 200, 0, 0.9)', 'goal');
+            }
+            
             platforms.push(goalSupportPlatform);
             goal = new Goal(goalX, goalY);
 
