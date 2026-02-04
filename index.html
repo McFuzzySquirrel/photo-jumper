@@ -666,14 +666,17 @@
         const COLLECTIBLE_LETTER_SIZE = 20;
         const COLLECTIBLE_LETTER_POINTS = 10;  // Points per letter
         const COLLECTIBLE_LETTER_FLOAT_SPEED = 0.1;  // Animation speed for floating effect
+        const COLLECTIBLE_LETTER_OFFSET_RATIO = 0.4;  // Ratio of platform width for random offset
+        const COLLECTIBLE_LETTER_MAX_OFFSET = 30;  // Maximum horizontal offset in pixels
+        const COLLECTIBLE_LETTER_VERTICAL_OFFSET = 10;  // Pixels above platform
         const WORD_COMPLETE_BONUS = 50;  // Bonus for collecting all letters
         const CORRECT_ORDER_BONUS = 100;  // Extra bonus for correct order
         const WORD_DICTIONARY = ['JUMP', 'PLAY', 'GAME', 'PHOTO', 'STAR', 'GOAL', 'WIN', 'FUN'];
         
-        // Pre-computed shortest word for fallback
-        const SHORTEST_WORD = WORD_DICTIONARY.reduce((shortest, word) => 
-            word.length < shortest.length ? word : shortest
-        );
+        // Pre-computed shortest word for fallback (safe with non-empty dictionary)
+        const SHORTEST_WORD = WORD_DICTIONARY.length > 0 
+            ? WORD_DICTIONARY.reduce((shortest, word) => word.length < shortest.length ? word : shortest)
+            : 'FUN';  // Fallback if dictionary is somehow empty
 
         let gameRunning = false;
         let platforms = [];
@@ -2050,9 +2053,12 @@
                 
                 // Place letter on top of platform, centered with some randomness
                 const platformCenterX = platform.x + platform.width / 2;
-                const randomOffsetX = (Math.random() - 0.5) * Math.min(platform.width * 0.4, 30);
+                const randomOffsetX = (Math.random() - 0.5) * Math.min(
+                    platform.width * COLLECTIBLE_LETTER_OFFSET_RATIO, 
+                    COLLECTIBLE_LETTER_MAX_OFFSET
+                );
                 const letterX = platformCenterX + randomOffsetX - COLLECTIBLE_LETTER_SIZE / 2;
-                const letterY = platform.y - COLLECTIBLE_LETTER_SIZE - 10;  // 10px above platform
+                const letterY = platform.y - COLLECTIBLE_LETTER_SIZE - COLLECTIBLE_LETTER_VERTICAL_OFFSET;
                 
                 letters.push(new Letter(targetWord[i], letterX, letterY, i));
             }
