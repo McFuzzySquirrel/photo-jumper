@@ -473,19 +473,26 @@
         /* Exit fullscreen button */
         .exit-fullscreen-btn {
             position: fixed;
-            top: 10px;
+            top: 60px;  /* Moved down to not overlap score */
             right: 10px;
             z-index: 101;
             background: rgba(0, 0, 0, 0.7);
             color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
             display: none;
+            cursor: pointer;
         }
 
         .exit-fullscreen-btn.visible {
             display: block;
+        }
+        
+        .exit-fullscreen-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #FFD700;
         }
 
         @media (max-width: 600px) {
@@ -513,7 +520,7 @@
     </style>
 </head>
 <body>
-    <button class="exit-fullscreen-btn" id="exitFullscreenBtn">✕ Exit Game</button>
+    <button class="exit-fullscreen-btn" id="exitFullscreenBtn">← Exit</button>
     
     <div class="container">
         <!-- Intro Screen -->
@@ -755,7 +762,8 @@
         let gameRunning = false;
         let platforms = [];
         let player = null;
-        let goal = null;  // Goal/end point for the level
+        let goal = null;  // Goal object for animation tracking
+        let goalPlatform = null;  // The platform that acts as the goal
         let playerSpawnY = 0;  // Calculated spawn Y position
         let keys = {};
         let score = 0;
@@ -1020,8 +1028,8 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.width = 40;  // Wider for door appearance
-                this.height = 60; // Taller for door appearance
+                this.width = 0;   // No separate goal object
+                this.height = 0;  // Goal is just the glowing platform
                 this.animation = 0;
             }
 
@@ -1030,84 +1038,12 @@
             }
 
             checkCollision(player) {
-                return player.x < this.x + this.width &&
-                       player.x + player.width > this.x &&
-                       player.y < this.y + this.height &&
-                       player.y + player.height > this.y;
+                // Collision is handled by the goal platform itself
+                return false;
             }
 
             draw() {
-                ctx.save();
-                
-                // Pulsing glow effect
-                const glowIntensity = 0.7 + Math.sin(this.animation * 2) * 0.3;
-                
-                // Outer glow
-                ctx.shadowColor = '#FFD700';
-                ctx.shadowBlur = 20 * glowIntensity;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
-                
-                // Main door/block body with golden gradient
-                const gradient = ctx.createLinearGradient(
-                    this.x, this.y,
-                    this.x + this.width, this.y + this.height
-                );
-                gradient.addColorStop(0, '#FFE66D');
-                gradient.addColorStop(0.5, '#FFD700');
-                gradient.addColorStop(1, '#FFA500');
-                
-                ctx.fillStyle = gradient;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
-                
-                // Reset shadow for details
-                ctx.shadowBlur = 0;
-                
-                // Dark border
-                ctx.strokeStyle = '#8B6914';
-                ctx.lineWidth = 3;
-                ctx.strokeRect(this.x, this.y, this.width, this.height);
-                
-                // Door frame detail
-                ctx.strokeStyle = '#B8860B';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(this.x + 4, this.y + 4, this.width - 8, this.height - 8);
-                
-                // Door panels
-                const panelY = this.y + 8;
-                const panelHeight = (this.height - 20) / 2;
-                
-                // Top panel
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-                ctx.fillRect(this.x + 8, panelY, this.width - 16, panelHeight);
-                
-                // Bottom panel
-                ctx.fillRect(this.x + 8, panelY + panelHeight + 4, this.width - 16, panelHeight);
-                
-                // Door knob
-                const knobX = this.x + this.width - 12;
-                const knobY = this.y + this.height / 2;
-                
-                ctx.fillStyle = '#DAA520';
-                ctx.beginPath();
-                ctx.arc(knobX, knobY, 3, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Sparkle effect
-                const sparkleCount = 3;
-                ctx.fillStyle = `rgba(255, 255, 255, ${glowIntensity})`;
-                for (let i = 0; i < sparkleCount; i++) {
-                    const angle = (this.animation * 2 + (i * Math.PI * 2 / sparkleCount));
-                    const sparkleRadius = 25;
-                    const sparkleX = this.x + this.width / 2 + Math.cos(angle) * sparkleRadius;
-                    const sparkleY = this.y + this.height / 2 + Math.sin(angle) * sparkleRadius;
-                    
-                    ctx.beginPath();
-                    ctx.arc(sparkleX, sparkleY, 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                
-                ctx.restore();
+                // Goal is drawn as part of the platform - nothing to draw here
             }
         }
 
@@ -1123,12 +1059,19 @@
             }
 
             draw() {
+                // Special glow effect for goal platform
+                if (this.kind === 'goal' && goal) {
+                    const glowIntensity = 0.7 + Math.sin(goal.animation * 2) * 0.3;
+                    ctx.shadowColor = '#FFD700';
+                    ctx.shadowBlur = 15 * glowIntensity;
+                } else {
+                    // Draw shadow for entire platform
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                    ctx.fillRect(this.x + 2, this.y + 2, this.width, this.height);
+                }
+                
                 // Draw platforms as a series of connected square blocks
                 const numBlocks = Math.floor(this.width / BLOCK_SIZE);
-                
-                // Draw shadow for entire platform
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-                ctx.fillRect(this.x + 2, this.y + 2, this.width, this.height);
                 
                 // Draw individual blocks
                 for (let i = 0; i < numBlocks; i++) {
@@ -1166,6 +1109,10 @@
                     ctx.lineWidth = 2;
                     ctx.strokeRect(blockX, blockY, remainingWidth, this.height);
                 }
+                
+                // Reset shadow
+                ctx.shadowBlur = 0;
+                ctx.shadowColor = 'transparent';
             }
         }
 
@@ -2283,10 +2230,8 @@
                 const topCandidates = candidateGoalPlatforms.slice(0, Math.min(MAX_GOAL_CANDIDATES, candidateGoalPlatforms.length));
                 const selectedPlatform = topCandidates[Math.floor(Math.random() * topCandidates.length)];
                 
-                // Position door (40x60) centered on platform
-                goalX = selectedPlatform.x + selectedPlatform.width / 2 - 20;  // Center the 40px wide door
-                goalY = selectedPlatform.y - 60; // Door is 60px tall, place on platform
-                goalSupportPlatform = new Platform(
+                // Create goal support platform
+                goalPlatform = new Platform(
                     selectedPlatform.x + selectedPlatform.width / 2 - (BLOCK_SIZE * 1.5),
                     selectedPlatform.y - BLOCK_SIZE,
                     BLOCK_SIZE * 3, 
@@ -2296,13 +2241,13 @@
                 );
             } else {
                 // Fallback to top-right if no suitable platforms found
-                goalX = width - 60;  // Adjusted for 40px wide door
-                goalY = 30;  // Adjusted for 60px tall door
-                goalSupportPlatform = new Platform(goalX, goalY + 60, BLOCK_SIZE * 3, BLOCK_SIZE, 'rgba(255, 200, 0, 0.9)', 'goal');
+                const goalX = width - 60;
+                const goalY = 30;
+                goalPlatform = new Platform(goalX, goalY + 60, BLOCK_SIZE * 3, BLOCK_SIZE, 'rgba(255, 200, 0, 0.9)', 'goal');
             }
             
-            platforms.push(goalSupportPlatform);
-            goal = new Goal(goalX, goalY);
+            platforms.push(goalPlatform);
+            goal = new Goal(0, 0);  // Just for animation tracking
 
             // Initialize player ON the start platform (not above it)
             playerSpawnY = startPlatformY - 20; // Player height is 20, so spawn on top of platform
@@ -2354,10 +2299,15 @@
             collectedLetters = [];
             
             // Get platforms that are suitable for letter placement AND reachable from start
-            // Exclude ground, start, and goal platforms
+            // Exclude ground, start, goal platforms
             const suitablePlatforms = platforms.filter(p => {
-                // Must be a photo/ml/helper platform
+                // Must be a photo/ml/helper platform (NOT goal)
                 if (p.kind !== 'photo' && p.kind !== 'ml' && p.kind !== 'helper') {
+                    return false;
+                }
+                
+                // Don't place letters on goal platform
+                if (p === goalPlatform) {
                     return false;
                 }
                 
@@ -2547,8 +2497,8 @@
                     }
                 }
                 
-                // Check if player reached the goal
-                if (goal && goal.checkCollision(player)) {
+                // Check if player reached the goal platform
+                if (goalPlatform && player.checkCollision(goalPlatform)) {
                     // Calculate bonuses if all letters were collected
                     if (collectedLetters.length === targetWord.length) {
                         wordCompleteBonus = WORD_COMPLETE_BONUS;
@@ -2638,11 +2588,11 @@
             // Bottom-left corner - Controls hint
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             if (!isMobile) {
-                ctx.font = '12px Arial';
+                ctx.font = '11px Arial';
                 ctx.textAlign = 'left';
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
                 const controlsY = canvas.height - 10;
-                ctx.fillText('Controls: Arrows/Space or A/W/D | Zoom: +/- or Mouse Wheel | R: Respawn', 10, controlsY);
+                ctx.fillText('Controls: Arrows/Space or A/W/D | Zoom: +/- or Wheel | R: Respawn | G: Regenerate Level', 10, controlsY);
             }
             
             ctx.restore();
@@ -3191,6 +3141,14 @@
             // Manual respawn with 'R' key
             if ((e.key === 'r' || e.key === 'R') && player && gameRunning) {
                 player.respawn();
+                e.preventDefault();
+                return;
+            }
+            
+            // Regenerate level with 'G' key
+            if ((e.key === 'g' || e.key === 'G') && backgroundImage && gameRunning) {
+                console.log('Regenerating level...');
+                processImage(backgroundImage);
                 e.preventDefault();
                 return;
             }
