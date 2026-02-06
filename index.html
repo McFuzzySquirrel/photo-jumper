@@ -947,10 +947,15 @@
         let onnxLoadError = null;
         let debugDetectedObjects = [];
 
-        // Calculate player size - should always match BLOCK_SIZE for consistent scale with platforms
-        // Player size does NOT scale with world - it stays at BLOCK_SIZE (20px)
+        // Calculate scaled block size - all visual elements scale with world dimensions
+        // This ensures consistent visual scale across different photo sizes
+        function getScaledBlockSize() {
+            return (worldWidth / BASE_WORLD_WIDTH) * BLOCK_SIZE;
+        }
+
+        // Calculate player size - should always match scaled block size for consistent scale with platforms
         function getScaledPlayerSize() {
-            return BLOCK_SIZE;  // Always 20px to match platform block size
+            return getScaledBlockSize();  // Scales with world to match platform block size
         }
 
         // Calculate player speed scaled to world dimensions
@@ -969,6 +974,11 @@
         // Gravity must scale proportionally to match jump physics
         function getScaledPlayerGravity() {
             return (worldWidth / BASE_WORLD_WIDTH) * PLAYER_GRAVITY;
+        }
+
+        // Calculate scaled letter size - scales with world for visibility
+        function getScaledLetterSize() {
+            return (worldWidth / BASE_WORLD_WIDTH) * COLLECTIBLE_LETTER_SIZE;
         }
 
         // Player class
@@ -1148,8 +1158,9 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.width = BLOCK_SIZE;   // Portal is one block wide
-                this.height = BLOCK_SIZE * 2;  // Portal is 2 blocks tall
+                const blockSize = getScaledBlockSize();
+                this.width = blockSize;   // Portal is one block wide
+                this.height = blockSize * 2;  // Portal is 2 blocks tall
                 this.animation = 0;
             }
 
@@ -1228,35 +1239,36 @@
                 }
                 
                 // Draw platforms as a series of connected square blocks
-                const numBlocks = Math.floor(this.width / BLOCK_SIZE);
+                const blockSize = getScaledBlockSize();
+                const numBlocks = Math.floor(this.width / blockSize);
                 
                 // Draw individual blocks
                 for (let i = 0; i < numBlocks; i++) {
-                    const blockX = this.x + (i * BLOCK_SIZE);
+                    const blockX = this.x + (i * blockSize);
                     const blockY = this.y;
                     
                     // Main block fill
                     ctx.fillStyle = this.color;
-                    ctx.fillRect(blockX, blockY, BLOCK_SIZE, this.height);
+                    ctx.fillRect(blockX, blockY, blockSize, this.height);
                     
                     // Block outline
                     ctx.strokeStyle = '#000';
                     ctx.lineWidth = 2;
-                    ctx.strokeRect(blockX, blockY, BLOCK_SIZE, this.height);
+                    ctx.strokeRect(blockX, blockY, blockSize, this.height);
                     
                     // Top highlight for each block
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
                     ctx.lineWidth = 1;
                     ctx.beginPath();
                     ctx.moveTo(blockX + 1, blockY + 1);
-                    ctx.lineTo(blockX + BLOCK_SIZE - 1, blockY + 1);
+                    ctx.lineTo(blockX + blockSize - 1, blockY + 1);
                     ctx.stroke();
                 }
                 
                 // Handle remaining width (partial block at end)
-                const remainingWidth = this.width - (numBlocks * BLOCK_SIZE);
+                const remainingWidth = this.width - (numBlocks * blockSize);
                 if (remainingWidth > 0) {
-                    const blockX = this.x + (numBlocks * BLOCK_SIZE);
+                    const blockX = this.x + (numBlocks * blockSize);
                     const blockY = this.y;
                     
                     ctx.fillStyle = this.color;
@@ -1279,8 +1291,9 @@
                 this.char = char;
                 this.x = x;
                 this.y = y;
-                this.width = COLLECTIBLE_LETTER_SIZE;
-                this.height = COLLECTIBLE_LETTER_SIZE;
+                const letterSize = getScaledLetterSize();
+                this.width = letterSize;
+                this.height = letterSize;
                 this.collected = false;
                 this.index = index;  // Position in the target word
                 this.animation = 0;
@@ -1312,7 +1325,7 @@
                 ctx.shadowBlur = 10;
                 ctx.fillStyle = '#FFD700';
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, COLLECTIBLE_LETTER_SIZE / 2, 0, Math.PI * 2);
+                ctx.arc(centerX, centerY, this.width / 2, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Reset shadow
@@ -1323,12 +1336,13 @@
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, COLLECTIBLE_LETTER_SIZE / 2, 0, Math.PI * 2);
+                ctx.arc(centerX, centerY, this.width / 2, 0, Math.PI * 2);
                 ctx.stroke();
 
-                // Draw the letter
+                // Draw the letter (scale font size with letter size)
                 ctx.fillStyle = '#000';
-                ctx.font = 'bold 16px Arial';
+                const fontSize = Math.max(12, Math.floor(this.width * 0.8));
+                ctx.font = `bold ${fontSize}px Arial`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(this.char, centerX, centerY);
@@ -1697,10 +1711,11 @@
                 const platformY = y;
                 const platformX = x;
                 
-                // Align width to block boundaries
-                const blockCount = Math.max(2, Math.ceil(w / BLOCK_SIZE));  // At least 2 blocks
-                const platformWidth = blockCount * BLOCK_SIZE;
-                const platformHeight = BLOCK_SIZE;  // One block tall
+                // Align width to block boundaries (use scaled block size)
+                const blockSize = getScaledBlockSize();
+                const blockCount = Math.max(2, Math.ceil(w / blockSize));  // At least 2 blocks
+                const platformWidth = blockCount * blockSize;
+                const platformHeight = blockSize;  // One block tall
                 
                 // Skip if platform would be in reserved areas
                 const isStartArea = (platformX < START_AREA_WIDTH && platformY > canvasHeight - START_AREA_HEIGHT);
@@ -2047,38 +2062,39 @@
                 if (current) merged.push(current);
 
                 // Convert to platform objects with block-aligned dimensions
+                const blockSize = getScaledBlockSize();
                 const platformsOut = [];
                 for (const m of merged) {
                     if (m.width < PLATFORM_MIN_WIDTH) continue;
                     
                     // Align platform width to block boundaries for clean appearance
-                    const blockCount = Math.ceil(m.width / BLOCK_SIZE);
-                    const alignedWidth = blockCount * BLOCK_SIZE;
+                    const blockCount = Math.ceil(m.width / blockSize);
+                    const alignedWidth = blockCount * blockSize;
                     
-                    const platformHeight = BLOCK_SIZE;  // One block tall
+                    const platformHeight = blockSize;  // One block tall
                     const color = platformColorFromBrightness(m.brightness);
                     const mainPlatform = new Platform(m.x, m.y, Math.min(alignedWidth, width - m.x), platformHeight, color, 'photo');
                     platformsOut.push(mainPlatform);
                     
                     // Add wall blocks at the ends of platforms for better climbing
                     // Left wall block
-                    if (m.x >= BLOCK_SIZE && mainPlatform.width >= BLOCK_SIZE * 3) {
+                    if (m.x >= blockSize && mainPlatform.width >= blockSize * 3) {
                         platformsOut.push(new Platform(
                             m.x, 
-                            m.y - BLOCK_SIZE, 
-                            BLOCK_SIZE, 
-                            BLOCK_SIZE, 
+                            m.y - blockSize, 
+                            blockSize, 
+                            blockSize, 
                             color, 
                             'photo'
                         ));
                     }
                     // Right wall block
-                    if (mainPlatform.x + mainPlatform.width + BLOCK_SIZE <= width && mainPlatform.width >= BLOCK_SIZE * 3) {
+                    if (mainPlatform.x + mainPlatform.width + blockSize <= width && mainPlatform.width >= blockSize * 3) {
                         platformsOut.push(new Platform(
-                            mainPlatform.x + mainPlatform.width - BLOCK_SIZE, 
-                            m.y - BLOCK_SIZE, 
-                            BLOCK_SIZE, 
-                            BLOCK_SIZE, 
+                            mainPlatform.x + mainPlatform.width - blockSize, 
+                            m.y - blockSize, 
+                            blockSize, 
+                            blockSize, 
                             color, 
                             'photo'
                         ));
@@ -2135,9 +2151,10 @@
                     return;
                 }
 
-                // Use smaller, more flexible helper blocks
-                const helperWidthOptions = [BLOCK_SIZE * 2, BLOCK_SIZE * 3];  // Try smallest first: 40px, 60px
-                const helperHeight = BLOCK_SIZE;
+                // Use smaller, more flexible helper blocks (scaled with world)
+                const blockSize = getScaledBlockSize();
+                const helperWidthOptions = [blockSize * 2, blockSize * 3];  // Try smallest first
+                const helperHeight = blockSize;
                 const helperColor = 'rgba(80, 120, 255, 0.9)';
 
                 let current = startPlatform;
@@ -2186,7 +2203,7 @@
                         }
                         
                         // Try shifting left and right with current width - more aggressive range
-                        for (let offset = BLOCK_SIZE; offset <= BLOCK_SIZE * 15; offset += BLOCK_SIZE) {
+                        for (let offset = blockSize; offset <= blockSize * 15; offset += blockSize) {
                             const leftX = Math.max(0, targetX - offset);
                             const rightX = Math.min(width - helperWidth, targetX + offset);
 
@@ -2216,9 +2233,9 @@
                         // Try stepping horizontally at same height
                         for (let stepMultiplier = 2; stepMultiplier <= 5; stepMultiplier++) {
                             const horizontalHelper = new Platform(
-                                currentCenter + toward * (BLOCK_SIZE * stepMultiplier), 
+                                currentCenter + toward * (blockSize * stepMultiplier), 
                                 current.y, 
-                                BLOCK_SIZE * 2, 
+                                blockSize * 2, 
                                 helperHeight, 
                                 helperColor, 
                                 'helper'
@@ -2241,9 +2258,9 @@
                         // Try going down to create descending path
                         for (let stepMultiplier = 1; stepMultiplier <= 3; stepMultiplier++) {
                             const downHelper = new Platform(
-                                currentCenter + toward * stepX - BLOCK_SIZE,
+                                currentCenter + toward * stepX - blockSize,
                                 Math.min(height - helperHeight - 20, current.y + (stepUp * stepMultiplier)),
-                                BLOCK_SIZE * 2,
+                                blockSize * 2,
                                 helperHeight,
                                 helperColor,
                                 'helper'
@@ -2266,18 +2283,18 @@
                     if (!placed) {
                         // Last resort: very small steps in multiple directions
                         const closeSteps = [
-                            { x: BLOCK_SIZE * 1.5, y: -BLOCK_SIZE * 1.5 },  // diagonal up-forward
-                            { x: BLOCK_SIZE * 2, y: -BLOCK_SIZE },          // forward-up
-                            { x: BLOCK_SIZE * 1, y: -BLOCK_SIZE * 2 },      // up-forward
-                            { x: BLOCK_SIZE * 2, y: 0 },                    // straight forward
-                            { x: BLOCK_SIZE * 1.5, y: BLOCK_SIZE },         // forward-down
+                            { x: blockSize * 1.5, y: -blockSize * 1.5 },  // diagonal up-forward
+                            { x: blockSize * 2, y: -blockSize },          // forward-up
+                            { x: blockSize * 1, y: -blockSize * 2 },      // up-forward
+                            { x: blockSize * 2, y: 0 },                    // straight forward
+                            { x: blockSize * 1.5, y: blockSize },         // forward-down
                         ];
                         
                         for (const step of closeSteps) {
                             const closeHelper = new Platform(
                                 currentCenter + (toward * step.x),
                                 current.y + step.y,
-                                BLOCK_SIZE * 2,
+                                blockSize * 2,
                                 helperHeight,
                                 helperColor,
                                 'helper'
@@ -2391,9 +2408,10 @@
             // Add a ground platform at the bottom (darker and more opaque)
             platforms.push(new Platform(0, height - 20, width, 20, 'rgba(100, 60, 20, 0.8)', 'ground'));
 
-            // Add starting platform (green to indicate start, 5 blocks wide)
+            // Add starting platform (green to indicate start, scaled with world)
+            const blockSize = getScaledBlockSize();
             const startPlatformY = height - 60;
-            const startPlatform = new Platform(10, startPlatformY, BLOCK_SIZE * 5, BLOCK_SIZE, 'rgba(0, 180, 0, 0.9)', 'start');
+            const startPlatform = new Platform(10, startPlatformY, blockSize * 5, blockSize, 'rgba(0, 180, 0, 0.9)', 'start');
             platforms.push(startPlatform);
 
             // Randomly select a goal location from suitable platforms
@@ -2429,31 +2447,31 @@
                 const topCandidates = candidateGoalPlatforms.slice(0, Math.min(MAX_GOAL_CANDIDATES, candidateGoalPlatforms.length));
                 const selectedPlatform = topCandidates[Math.floor(Math.random() * topCandidates.length)];
                 
-                // Create goal support platform
+                // Create goal support platform (use scaled block size)
                 // Ensure platform is low enough that portal above it will be visible
-                const minPlatformY = WORD_BAR_AREA_HEIGHT + (BLOCK_SIZE * 2) + 10;  // Room for portal above
-                const platformY = Math.max(minPlatformY, selectedPlatform.y - BLOCK_SIZE);
+                const minPlatformY = WORD_BAR_AREA_HEIGHT + (blockSize * 2) + 10;  // Room for portal above
+                const platformY = Math.max(minPlatformY, selectedPlatform.y - blockSize);
                 
                 goalPlatform = new Platform(
-                    selectedPlatform.x + selectedPlatform.width / 2 - (BLOCK_SIZE * 1.5),
+                    selectedPlatform.x + selectedPlatform.width / 2 - (blockSize * 1.5),
                     platformY,
-                    BLOCK_SIZE * 3, 
-                    BLOCK_SIZE, 
+                    blockSize * 3, 
+                    blockSize, 
                     'rgba(255, 200, 0, 0.9)', 
                     'goal'
                 );
             } else {
                 // Fallback to safe position if no suitable platforms found
-                const goalX = width - (BLOCK_SIZE * 4);  // Ensure it's not too close to edge
-                const goalY = WORD_BAR_AREA_HEIGHT + (BLOCK_SIZE * 2) + 20;  // Low enough for portal to be above
-                goalPlatform = new Platform(goalX, goalY, BLOCK_SIZE * 3, BLOCK_SIZE, 'rgba(255, 200, 0, 0.9)', 'goal');
+                const goalX = width - (blockSize * 4);  // Ensure it's not too close to edge
+                const goalY = WORD_BAR_AREA_HEIGHT + (blockSize * 2) + 20;  // Low enough for portal to be above
+                goalPlatform = new Platform(goalX, goalY, blockSize * 3, blockSize, 'rgba(255, 200, 0, 0.9)', 'goal');
             }
             
             platforms.push(goalPlatform);
             
-            // Create portal on top of goal platform
-            const portalX = goalPlatform.x + (goalPlatform.width / 2) - (BLOCK_SIZE / 2);  // Center on platform
-            const portalY = goalPlatform.y - (BLOCK_SIZE * 2);  // Portal sits on top of platform
+            // Create portal on top of goal platform (use scaled block size)
+            const portalX = goalPlatform.x + (goalPlatform.width / 2) - (blockSize / 2);  // Center on platform
+            const portalY = goalPlatform.y - (blockSize * 2);  // Portal sits on top of platform
             
             goal = new Goal(portalX, portalY);
             
@@ -2601,13 +2619,14 @@
                 }
                 
                 // Place letter on top of platform, centered with some randomness
+                const letterSize = getScaledLetterSize();
                 const platformCenterX = platform.x + platform.width / 2;
                 const randomOffsetX = (Math.random() - 0.5) * Math.min(
                     platform.width * COLLECTIBLE_LETTER_OFFSET_RATIO, 
                     COLLECTIBLE_LETTER_MAX_OFFSET
                 );
-                const letterX = platformCenterX + randomOffsetX - COLLECTIBLE_LETTER_SIZE / 2;
-                const letterY = platform.y - COLLECTIBLE_LETTER_SIZE - COLLECTIBLE_LETTER_VERTICAL_OFFSET;
+                const letterX = platformCenterX + randomOffsetX - letterSize / 2;
+                const letterY = platform.y - letterSize - COLLECTIBLE_LETTER_VERTICAL_OFFSET;
                 
                 letters.push(new Letter(targetWord[i], letterX, letterY, i));
             }
