@@ -1011,7 +1011,7 @@
         const ML_INFERENCE_TIMEOUT_MS = 5000;
         const ML_MIN_DETECTION_SIZE = 10;  // Minimum bounding box size in pixels to consider
         const ML_PLATFORM_MERGE_TOLERANCE = 20;  // Extra horizontal gap tolerance when merging ML platforms
-        const ML_PLATFORM_OVERLAP_TOLERANCE_Y = 10;  // Vertical overlap tolerance when combining ML and grid platforms
+        const ML_PLATFORM_OVERLAP_TOLERANCE_Y = 30;  // Vertical overlap tolerance when combining ML and grid platforms (increased for better coverage)
         
         // COCO classes that are suitable for platforms (horizontal surfaces)
         const PLATFORMABLE_CLASSES = [
@@ -1821,15 +1821,16 @@
             return unionArea > 0 ? interArea / unionArea : 0;
         }
 
-        // Map detected objects to platform surfaces (top-edge for standing)
+        // Map detected objects to platform surfaces (bottom-edge for standing)
         function mapObjectsToPlatforms(detections, canvasWidth, canvasHeight) {
             const platformCandidates = [];
             
             for (const detection of detections) {
                 const [x, y, w, h] = detection.bbox;
                 
-                // Use TOP edge as platform surface with block-aligned dimensions
-                const platformY = y;
+                // Use BOTTOM edge as platform surface - this is where the player stands on the object
+                // y = top of bounding box, y + h = bottom of bounding box (where platform should be)
+                const platformY = y + h;  // Bottom edge of detected object
                 const platformX = x;
                 
                 // Align width to block boundaries (use scaled block size)
@@ -2322,8 +2323,10 @@
             
             // Remove platforms that are stacked too closely vertically
             function filterVerticallyClashingPlatforms(platforms) {
-                // Minimum gap should be player width (20px) plus clearance for comfortable passage
-                const minVerticalGap = PLAYER_SIZE + 15;  // 35px - comfortably fits 20px player with margin
+                // Minimum gap should allow player to pass comfortably
+                // Player is 20px tall, so we need at least that much clearance
+                // Reduced from 35px to 25px to allow tighter but still playable platforming
+                const minVerticalGap = PLAYER_SIZE + 5;  // 25px - fits 20px player with small margin
                 const filtered = [];
                 
                 // Sort by Y position
@@ -2668,19 +2671,25 @@
                 platforms = [...mlPlatforms];
                 
                 // Add grid-based platforms that don't significantly overlap with ML platforms
+                // We want to keep grid platforms that fill gaps, but remove ones that would
+                // create confusing stacks or duplicate existing ML platforms
                 for (const gridPlatform of gridBasedPlatforms) {
-                    let overlapsML = false;
+                    let shouldSkip = false;
                     for (const mlPlatform of mlPlatforms) {
-                        const overlap = !(gridPlatform.x + gridPlatform.width < mlPlatform.x ||
-                            gridPlatform.x > mlPlatform.x + mlPlatform.width ||
-                            gridPlatform.y + gridPlatform.height < mlPlatform.y - ML_PLATFORM_OVERLAP_TOLERANCE_Y ||
-                            gridPlatform.y > mlPlatform.y + mlPlatform.height + ML_PLATFORM_OVERLAP_TOLERANCE_Y);
-                        if (overlap) {
-                            overlapsML = true;
-                            break;
+                        // Check for horizontal overlap first
+                        const horizontalOverlap = !(gridPlatform.x + gridPlatform.width <= mlPlatform.x ||
+                            gridPlatform.x >= mlPlatform.x + mlPlatform.width);
+                        
+                        if (horizontalOverlap) {
+                            // Only skip if platforms are very close vertically (would create confusing stack)
+                            const verticalDistance = Math.abs(gridPlatform.y - mlPlatform.y);
+                            if (verticalDistance < ML_PLATFORM_OVERLAP_TOLERANCE_Y) {
+                                shouldSkip = true;
+                                break;
+                            }
                         }
                     }
-                    if (!overlapsML) {
+                    if (!shouldSkip) {
                         platforms.push(gridPlatform);
                     }
                 }
