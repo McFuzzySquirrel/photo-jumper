@@ -413,6 +413,59 @@
             margin-right: 12px;
         }
 
+        /* Splash screen styles */
+        .splash-screen {
+            text-align: center;
+            padding: 60px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+        }
+
+        .splash-screen.hidden {
+            display: none;
+        }
+
+        .splash-screen .game-logo {
+            max-width: 280px;
+            margin-bottom: 30px;
+            animation: splashPulse 2s ease-in-out infinite;
+        }
+
+        .splash-screen .splash-title {
+            font-size: 2.8em;
+            color: #333;
+            margin-bottom: 12px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .splash-screen .splash-subtitle {
+            font-size: 1.1em;
+            color: #888;
+            margin-bottom: 40px;
+        }
+
+        .splash-screen .splash-btn {
+            font-size: 1.4em;
+            padding: 18px 48px;
+            border-radius: 50px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 8px 30px rgba(240, 147, 251, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .splash-screen .splash-btn:hover {
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 12px 40px rgba(240, 147, 251, 0.5);
+        }
+
+        @keyframes splashPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+
         /* Intro screen styles */
         .intro-screen {
             text-align: center;
@@ -673,8 +726,16 @@
     <button class="exit-fullscreen-btn" id="exitFullscreenBtn">← Exit</button>
     
     <div class="container">
+        <!-- Splash Screen -->
+        <div class="splash-screen" id="splashScreen">
+            <img src="images/photo-jumper-sq.png" alt="Photo Jumper" class="game-logo">
+            <h1 class="splash-title">Photo Jumper</h1>
+            <p class="splash-subtitle">Turn your photos into playable levels</p>
+            <button class="splash-btn" id="splashPlayBtn">Let's Jump!</button>
+        </div>
+
         <!-- Intro Screen -->
-        <div class="intro-screen" id="introScreen">
+        <div class="intro-screen hidden" id="introScreen">
             <div class="two-col">
                 <div class="col-image">
                     <img src="images/photo-jumper-sq.png" alt="Photo Jumper" class="game-logo">
@@ -830,6 +891,8 @@
         
         const introScreen = document.getElementById('introScreen');
         const gameScreen = document.getElementById('gameScreen');
+        const splashScreen = document.getElementById('splashScreen');
+        const splashPlayBtn = document.getElementById('splashPlayBtn');
         const startGameBtn = document.getElementById('startGameBtn');
         const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
         const container = document.querySelector('.container');
@@ -1925,11 +1988,12 @@
             const maxHangTime = (2 * jumpPower) / gravity;
             const maxJumpDx = speed * maxHangTime;
 
-            // Conservative safety margins (gameplay-first): if we say reachable, it should be reachable.
-            // Increased margins to be more generous and ensure better level traversability
+            // Conservative safety margins (gameplay-first): if we say reachable, it should
+            // be comfortably reachable — not a frame-perfect jump.
+            // 0.85 vertical / 0.80 horizontal ensures helpers get inserted for borderline gaps.
             return {
-                maxJumpUp: maxJumpUp * 0.95,  // Increased from 0.9 for more vertical reach
-                maxJumpDx: maxJumpDx * 0.90,  // Increased from 0.85 for more horizontal reach
+                maxJumpUp: maxJumpUp * 0.85,  // 15% margin below theoretical max
+                maxJumpDx: maxJumpDx * 0.80,  // 20% margin below theoretical max
                 jumpPower,
                 gravity,
                 speed
@@ -2870,6 +2934,23 @@
             // Place collectible letters on platforms (pass limits and startPlatform for reachability check)
             placeLettersOnPlatforms(startPlatform, limits);
 
+            // Second helper pass: ensure every letter platform is comfortably reachable.
+            // The first pass only ensured start→goal; letters may be on side branches
+            // that are borderline or unreachable with the tighter safety margins.
+            for (const letter of letters) {
+                // Find the platform this letter sits on
+                const letterPlatform = platforms.find(p =>
+                    p.kind !== 'wall' && p.kind !== 'ground' &&
+                    letter.x + letter.width > p.x &&
+                    letter.x < p.x + p.width &&
+                    Math.abs((letter.y + letter.height) - p.y) < getScaledBlockSize() * 2
+                );
+                if (letterPlatform && !isReachable(startPlatform, letterPlatform, platforms, limits)) {
+                    console.log(`Adding helpers for letter '${letter.letter}' platform at y=${Math.round(letterPlatform.y)}`);
+                    addHelperPlatformsIfNeeded(startPlatform, letterPlatform, platforms, limits);
+                }
+            }
+
             // Start game
             startGame();
         }
@@ -3373,8 +3454,9 @@
             ctx.fillText('Press ESC or click "Exit Game" to return to start', canvas.width / 2, canvas.height / 2 + yOffset + 55);
         }
 
-        // Show intro screen
+        // Show intro screen (from splash or back from game)
         function showIntroScreen() {
+            splashScreen.classList.add('hidden');
             introScreen.classList.remove('hidden');
             gameScreen.classList.remove('active');
             exitFullscreen();
@@ -3382,6 +3464,7 @@
 
         // Show game screen
         function showGameScreen() {
+            splashScreen.classList.add('hidden');
             introScreen.classList.add('hidden');
             gameScreen.classList.add('active');
         }
@@ -3583,6 +3666,7 @@
         }
 
         // Event listeners
+        splashPlayBtn.addEventListener('click', showIntroScreen);
         startGameBtn.addEventListener('click', showGameScreen);
         exitFullscreenBtn.addEventListener('click', returnToIntro);
         
