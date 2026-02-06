@@ -887,6 +887,24 @@
             return Math.max(MIN_PLAYER_SIZE, scaledSize);
         }
 
+        // Calculate player speed scaled to world dimensions
+        // Speed must scale proportionally so movement feels consistent across world sizes
+        function getScaledPlayerSpeed() {
+            return (worldWidth / BASE_WORLD_WIDTH) * PLAYER_SPEED;
+        }
+
+        // Calculate player jump power scaled to world dimensions
+        // Jump power must scale proportionally so jumping feels consistent across world sizes
+        function getScaledPlayerJumpPower() {
+            return (worldWidth / BASE_WORLD_WIDTH) * PLAYER_JUMP_POWER;
+        }
+
+        // Calculate player gravity scaled to world dimensions
+        // Gravity must scale proportionally to match jump physics
+        function getScaledPlayerGravity() {
+            return (worldWidth / BASE_WORLD_WIDTH) * PLAYER_GRAVITY;
+        }
+
         // Player class
         class Player {
             constructor(x, y) {
@@ -898,9 +916,10 @@
                 this.height = playerSize;
                 this.velocityX = 0;
                 this.velocityY = 0;
-                this.speed = PLAYER_SPEED;
-                this.jumpPower = PLAYER_JUMP_POWER;
-                this.gravity = PLAYER_GRAVITY;
+                // Scale speed, jump power, and gravity to match world size
+                this.speed = getScaledPlayerSpeed();
+                this.jumpPower = getScaledPlayerJumpPower();
+                this.gravity = getScaledPlayerGravity();
                 this.onGround = false;
                 this.lastPositionTime = Date.now();
                 this.lastX = x;
@@ -1696,9 +1715,9 @@
         }
 
         function getJumpLimits() {
-            const jumpPower = PLAYER_JUMP_POWER;
-            const gravity = PLAYER_GRAVITY;
-            const speed = PLAYER_SPEED;
+            const jumpPower = getScaledPlayerJumpPower();
+            const gravity = getScaledPlayerGravity();
+            const speed = getScaledPlayerSpeed();
 
             const maxJumpUp = (jumpPower * jumpPower) / (2 * gravity);
             const maxHangTime = (2 * jumpPower) / gravity;
