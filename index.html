@@ -809,6 +809,7 @@
         const COLLECTIBLE_LETTER_OFFSET_RATIO = 0.4;  // Ratio of platform width for random offset
         const COLLECTIBLE_LETTER_MAX_OFFSET = 30;  // Maximum horizontal offset in pixels
         const COLLECTIBLE_LETTER_VERTICAL_OFFSET = 10;  // Pixels above platform
+        const COLLECTIBLE_LETTER_FONT_SIZE_RATIO = 0.8;  // Font size as ratio of letter width
         const WORD_COMPLETE_BONUS = 50;  // Bonus for collecting all letters
         const CORRECT_ORDER_BONUS = 100;  // Extra bonus for correct order
         const WORD_DICTIONARY = ['JUMP', 'PLAY', 'GAME', 'PHOTO', 'STAR', 'GOAL', 'WIN', 'FUN'];
@@ -1341,7 +1342,7 @@
 
                 // Draw the letter (scale font size with letter size)
                 ctx.fillStyle = '#000';
-                const fontSize = Math.max(12, Math.floor(this.width * 0.8));
+                const fontSize = Math.max(12, Math.floor(this.width * COLLECTIBLE_LETTER_FONT_SIZE_RATIO));
                 ctx.font = `bold ${fontSize}px Arial`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
