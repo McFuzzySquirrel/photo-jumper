@@ -1,9 +1,21 @@
 ---
 applyTo: '**'
 ---
-This repository contains **Photo Jumper**, a web-based platformer where players take a photo and the game generates a playable level by detecting straight lines and converting them into platforms.
+This repository contains **Photo Jumper**, a web-based platformer where players take a photo and the game generates a playable level using block-based platforms detected from image brightness, edges, and (optionally) ONNX-based ML object detection.
 
 These instructions define the **non-negotiable design principles, gameplay rules, and technical constraints** that GitHub Copilot and AI coding agents must follow when suggesting or modifying code in this repository.
+
+---
+
+## ⚡ Latest Context — Check EJS Docs First
+
+Before making decisions, check the **EJS (Engineering Journey System)** docs for the most up-to-date architecture decisions and session context:
+
+1. **`ejs-docs/adr/`** — Latest ADRs with linked journey sessions (most current architectural decisions)
+2. **`ejs-docs/journey/`** — Dated session logs showing what changed and why (sorted by date, check newest first)
+3. **`ejs-docs/agent-memory/`** — Learned patterns, anti-patterns, and prompt patterns
+
+These take precedence over `docs/adr/` when there is a conflict, as they represent the latest state.
 
 ---
 
@@ -43,34 +55,59 @@ Copilot should prioritize:
 
 Detected image geometry must be treated as **input hints**, not ground truth.
 
-**Current approach:** Grid-based brightness/edge sampling (see ADR 0003)  
-**Future exploration:** ONNX Runtime Web for semantic object detection (see [Object Detection Research](../../learning/journey/research/object-detection.md))
+### Grid-Based Detection (Primary — always available)
+
+Grid-based brightness/edge sampling (see ADR 0003):
+
+- Grid cells are sampled at `GRID_SIZE` (20px) intervals
+- Brightness and edge-detection thresholds filter candidate cells
+- Cells are merged into block-aligned platforms
+- Short, noisy, or low-confidence regions are discarded
+
+### ONNX ML Object Detection (Optional — opt-in)
+
+ONNX Runtime Web with YOLOv8n model (see ADRs 0005, 0007):
+
+- **Opt-in** toggle in the game UI; disabled by default on low-power devices
+- Lazy-loaded from CDN (`onnxruntime-web@1.17.0`) — does not penalize initial page load
+- Uses WASM backend for broad compatibility
+- Detects objects from COCO dataset classes; filters by `PLATFORMABLE_CLASSES`
+- Bottom-edge heuristic maps bounding boxes to platform surfaces
+- Falls back to grid-based detection on any error, timeout, or user toggle-off
+- ML-detected platforms are merged with grid-based platforms; duplicates are filtered
+- All ML-generated platforms pass through the same gameplay constraints as grid platforms
 
 Copilot must ensure:
 
-- Lines are filtered, normalized, and merged before becoming platforms
-- Short, noisy, or low-confidence lines are discarded
-- Nearly collinear lines are merged into single platforms
-- Near-horizontal lines are snapped to true horizontal within tolerance
 - Platform generation respects gameplay constraints even if it alters photo fidelity
-- Any ML-based detection (if implemented) must be optional and fall back to grid-based method
-- ML-detected objects must still pass through all gameplay constraints (reachability, fairness, etc.)
+- ML detection remains optional and never required for playable levels
+- Any new detection method must fall back gracefully to grid-based detection
+- All platforms (regardless of source) pass reachability validation
 
 ---
 
-## Platform Geometry Constraints
+## Block-Based Platform System
 
-All generated platforms must obey:
+Platforms use a **modular block system** (see ADR 0009):
 
-- Minimum platform width (e.g. ~40px)
-- Minimum platform thickness (e.g. ~12–16px)
-- No paper-thin collision surfaces
-- No invisible collision padding beyond visuals
-- Visual edges must match collision edges exactly
+- `BLOCK_SIZE = 20` — all platforms snap to the 20px grid
+- `PLATFORM_THICKNESS = BLOCK_SIZE` (1 block high)
+- Minimum platform width: **2 blocks (40px)**
+- Wall blocks are placed at platform edges (1 block tall) for visual clarity
+- Platforms are rendered with individual block outlines for a pixel/block aesthetic
+- Vertical clash filtering removes platforms that overlap or crowd vertically
 
-If detected geometry violates these rules:
-- Adjust it to be playable, **or**
-- Discard it entirely
+### Helper Platform Strategy (5-Level Fallback)
+
+When gaps exceed jump capability, helper platforms are inserted using a 5-step escalation:
+
+1. Midpoint platform between two reachable platforms
+2. Staircase of stepping-stone blocks
+3. Extended landing shelf on the target platform
+4. Bridge of small block platforms across the gap
+5. Direct connector as a last resort
+
+Helper platforms must always result in a reachable path.
 
 ---
 
@@ -78,15 +115,50 @@ If detected geometry violates these rules:
 
 Levels must always be winnable using current player physics.
 
+### Variable-Height Jump
+
+The game uses a **jump-cut mechanic**:
+- **Tap/quick press** = short hop (velocity damped by `JUMP_CUT_DAMPING` on release)
+- **Hold** = full-height jump (unchanged maximum)
+- Maximum jump height is the physics invariant; minimum jump height is player-controlled
+- The jump cut applies during the rising phase only (while `velocityY < 0`)
+
+### Reachability Validation
+
+- Multi-hop BFS validates that all letters and the goal are reachable from spawn
+- Reachability is checked before gameplay begins
+- If reachability fails, helper platforms are inserted or geometry is adjusted
+- `MAX_GOAL_CANDIDATES = 3` — goal position is randomized among top reachable candidates
+
 Copilot must:
 
-- Respect maximum horizontal jump distance
-- Respect maximum vertical jump height
+- Respect maximum horizontal jump distance and vertical jump height
 - Prevent accidental precision jumps
 - Insert helper platforms or adjust geometry if gaps exceed limits
-- Ensure start → end reachability before gameplay begins
+- Ensure start → goal reachability before gameplay begins
+- Never modify jump physics values unless explicitly requested
 
-Jump physics values are **invariants** and must not be modified unless explicitly requested.
+---
+
+## Letter Collection & Scoring
+
+The game includes a **word-spelling challenge** (see ADR 0008):
+
+- A random word is chosen from `WORD_DICTIONARY` at level start
+- Golden letter collectibles are placed on reachable platforms (validated by BFS)
+- Players collect letters by walking through them
+- A word bar HUD shows progress (collected vs uncollected letters)
+- Bonus points for completing the word; extra bonus for collecting in correct order
+- Letters must not be placed on unreachable platforms
+
+---
+
+## Goal System
+
+- A **golden portal** is placed on the goal platform
+- The goal platform glows with a pulsing effect
+- Walking into the portal wins the level
+- Goal position is randomized among `MAX_GOAL_CANDIDATES` top reachable platforms
 
 ---
 
@@ -111,7 +183,45 @@ Copilot must ensure:
 - Stable collision at platform boundaries
 - Predictable physics at all frame rates
 
+### Camera & Zoom
+
+- Camera follows the player with configurable smoothing
+- Auto-fit zoom (`camera.autoFitZoom`) is computed to fit the world in the viewport
+- Zoom controls: `+`/`-` keys, `0` resets to auto-fit, mouse wheel, on-screen ±/⊙ buttons
+- Zoom range: `camera.minZoom` (computed) to `camera.maxZoom` (2.0)
+
+### Stuck Detection
+
+- 15-second inactivity timer (`STUCK_CHECK_INTERVAL`)
+- If the player hasn't moved `STUCK_MOVEMENT_THRESHOLD` and is on the ground, auto-respawn triggers
+- Timer resets on any input
+
 Small feedback improvements (e.g. clearer landings) are preferred over complex systems.
+
+---
+
+## Controls
+
+### Keyboard
+- **Arrow keys / WASD** — movement
+- **Space / Up / W** — jump (hold for full height, tap for short hop)
+- **R** — respawn at start position
+- **G** — regenerate level from same photo
+- **+/-** — zoom in/out
+- **0** — reset zoom to auto-fit
+
+### Touch (Mobile)
+- **◀ ▲ ▶ buttons** — left, jump, right (80% opacity, bumps to 100% on press)
+- **Canvas swipe** — horizontal movement; tap to jump
+- **On-screen R/G buttons** — respawn and regenerate (grouped with zoom controls)
+
+### On-Screen Button Group (bottom-right, visible in fullscreen)
+- **G** — regenerate level
+- **R** — respawn
+- *(visual separator)*
+- **−** — zoom out
+- **⊙** — reset zoom
+- **+** — zoom in
 
 ---
 
@@ -119,11 +229,10 @@ Small feedback improvements (e.g. clearer landings) are preferred over complex s
 
 When useful, Copilot should prefer adding **optional debug tooling** over guessing.
 
-Recommended debug features:
-- Raw detected lines overlay
-- Final platform geometry overlay
-- Visual distinction for discarded lines
-- Clear explanation of why geometry was modified
+Implemented debug features (toggled via checkbox in game UI):
+- Debug overlay showing detected grid cells, platform bounds, and player collision box
+- ML detection overlay showing ONNX-detected bounding boxes and confidence scores
+- Visual distinction between grid-detected and ML-detected platforms
 
 Debug features must not affect gameplay performance when disabled.
 
@@ -138,8 +247,9 @@ Copilot must:
 - Keep physics lightweight and deterministic
 - Expose tunable values instead of hardcoding numbers
 - Prefer clarity and readability over cleverness
-- If implementing ML-based object detection (ONNX), ensure it's lazy-loaded and optional
-- Maintain single-file `index.html` philosophy where possible (CDN imports are acceptable)
+- ONNX Runtime Web is lazy-loaded from CDN; never block page load on ML model
+- Maintain single-file `index.html` philosophy (CDN imports are acceptable)
+- All physics scale proportionally to world size via `BASE_WORLD_WIDTH` ratio
 
 ---
 
@@ -162,39 +272,45 @@ If proposing complexity, Copilot must also explain:
 
 ## Recommended Config Values
 
-These are **baseline values** for a multi-device web game. Copilot must reference these when suggesting geometry processing or physics code.
+These are the **actual values** used in the game. Copilot must reference these when suggesting physics, geometry, or detection code.
 
-### Player Physics (Invariants)
-- Max horizontal jump: **120px**
-- Max vertical jump height: **90px**
-- Player hitbox: **16px wide × 24px tall**
-- Landing tolerance: **4px** vertical snap distance
+### Player Physics (Invariants — do not modify without explicit request)
+- `PLAYER_SIZE = 20` — 20×20px hitbox (matches `BLOCK_SIZE`)
+- `PLAYER_SPEED = 3` — horizontal movement speed
+- `PLAYER_JUMP_POWER = 14` — initial upward velocity on jump
+- `PLAYER_GRAVITY = 0.5` — downward acceleration per frame
+- `JUMP_CUT_DAMPING = 0.5` — velocity multiplier on early jump release (variable jump)
+- All physics scale with `worldWidth / BASE_WORLD_WIDTH` ratio
 
-### Platform Geometry Constraints
-- Minimum width: **40px**
-- Minimum thickness: **12px**
-- Snap near-horizontal tolerance: **8°**
-- Merge collinear tolerance: **6px**
+### Block & Platform Geometry
+- `BLOCK_SIZE = 20` — fundamental grid/block unit
+- `GRID_SIZE = 20` — detection grid cell size (matches block size)
+- `PLATFORM_THICKNESS = BLOCK_SIZE` — platforms are 1 block thick
+- Minimum platform width: **2 blocks (40px)**
+- Wall blocks at platform edges: **1 block tall**
+
+### Detection Thresholds
+- `BRIGHTNESS_THRESHOLD = 140` — minimum brightness for grid-based platform detection
+- `EDGE_DETECTION_THRESHOLD = 30` — edge gradient threshold
+- `ML_CONFIDENCE_THRESHOLD = 0.3` — ONNX detection confidence filter
+- `ML_INPUT_SIZE = 640` — YOLOv8n input dimensions
+- `ML_INFERENCE_TIMEOUT_MS = 5000` — maximum ML inference time before fallback
 
 ### Level Safety Guardrails
-- Maximum gap width: **140px** (≈ max jump distance + buffer)
-- Maximum drop height: **100px** (must be reachable)
-- Minimum platform spacing: **20px**
-- Required clearance above player: **30px**
+- Multi-hop BFS reachability validation for all letters and goal
+- 5-level helper platform fallback strategy
+- `MAX_GOAL_CANDIDATES = 3` — goal randomization pool
+- `STUCK_CHECK_INTERVAL = 15000` — 15s inactivity auto-respawn
 
-### Responsive Scaling
-- Mobile (< 600px viewport): **0.8x scale**
-- Tablet (600–1000px): **1.0x scale** (baseline)
-- Desktop (> 1000px): **1.2x scale**
-
-### Image Processing Thresholds
-- Minimum line length: **30px**
-- Confidence threshold: **0.6** (0–1)
-- Noise filter blur: **3px radius**
+### Camera & Viewport
+- `camera.autoFitZoom` — computed to fit world in viewport
+- `camera.maxZoom = 2.0`
+- `camera.smoothing = 0.1`
+- Canvas fills full viewport in fullscreen mode (`window.innerWidth × window.innerHeight`)
 
 ### Performance Targets
 - Target frame rate: **60 fps**
-- Max line processing time: **100ms**
+- Max ML inference time: **5000ms** (falls back to grid-based on timeout)
 - Max platform count: **50**
 
 ---
@@ -203,11 +319,24 @@ These are **baseline values** for a multi-device web game. Copilot must referenc
 
 A change is considered successful only if:
 
-- The level remains winnable
+- The level remains winnable (BFS reachability passes)
 - Platforms feel solid and fair
 - Player deaths are explainable
 - Visuals and collisions are aligned
+- Letters are collectible and reachable
+- Goal portal is reachable
+- Variable jump feels responsive (tap = short hop, hold = full jump)
 - Performance remains acceptable on modest devices
+
+---
+
+## Key ADRs
+
+- **ADR 0003** — Grid-based platform detection density and mobile controls
+- **ADR 0005** — ONNX-based object detection for platform generation
+- **ADR 0007** — ONNX Runtime Web implementation and fixes
+- **ADR 0008** — Letter collection, scoring, and reachability validation
+- **ADR 0009** — Modular block platform system
 
 ---
 

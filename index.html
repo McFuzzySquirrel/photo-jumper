@@ -294,12 +294,14 @@
             cursor: pointer;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
             touch-action: none;
-            transition: transform 0.1s, box-shadow 0.1s;
+            transition: transform 0.1s, box-shadow 0.1s, opacity 0.1s;
+            opacity: 0.8;
         }
 
         .control-btn:active {
             transform: scale(0.95);
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            opacity: 1.0;
         }
 
         .control-btn.jump-btn {
@@ -348,6 +350,26 @@
         .zoom-btn:active {
             background: rgba(255, 255, 255, 0.3);
             transform: scale(0.95);
+        }
+
+        /* Game action buttons (R/G) in zoom group */
+        .zoom-btn.zoom-btn-action {
+            background: rgba(102, 126, 234, 0.7);
+            border-color: rgba(255, 255, 255, 0.7);
+            font-size: 16px;
+        }
+
+        .zoom-btn.zoom-btn-action:hover {
+            background: rgba(102, 126, 234, 0.9);
+            border-color: #FFD700;
+        }
+
+        /* Visual separator between game action buttons and zoom buttons */
+        .zoom-btn-separator {
+            width: 30px;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.3);
+            align-self: center;
         }
 
         /* Intro screen styles */
@@ -652,8 +674,11 @@
             <button class="control-btn" id="rightBtn" aria-label="Move right">▶</button>
         </div>
 
-        <!-- Zoom control buttons -->
+        <!-- Zoom & game action control buttons -->
         <div class="zoom-controls" id="zoomControls">
+            <button class="zoom-btn zoom-btn-action" id="regenBtn" aria-label="Regenerate level" title="Regenerate level (G)">G</button>
+            <button class="zoom-btn zoom-btn-action" id="respawnBtn" aria-label="Respawn" title="Respawn (R)">R</button>
+            <div class="zoom-btn-separator"></div>
             <button class="zoom-btn" id="zoomOutBtn" aria-label="Zoom out" title="Zoom out (-)">−</button>
             <button class="zoom-btn" id="zoomResetBtn" aria-label="Reset zoom" title="Reset zoom (0)">⊙</button>
             <button class="zoom-btn" id="zoomInBtn" aria-label="Zoom in" title="Zoom in (+)">+</button>
@@ -765,6 +790,8 @@
         const zoomInBtn = document.getElementById('zoomInBtn');
         const zoomOutBtn = document.getElementById('zoomOutBtn');
         const zoomResetBtn = document.getElementById('zoomResetBtn');
+        const respawnBtn = document.getElementById('respawnBtn');
+        const regenBtn = document.getElementById('regenBtn');
 
         const FEEDBACK_TOKEN_STORAGE_KEY = 'photoJumperFeedbackToken';
 
@@ -773,6 +800,7 @@
         const PLAYER_SPEED = 3;  // Reduced from 4 for more precise positioning in tight gaps
         const PLAYER_JUMP_POWER = 14;  // Increased from 12 - allows jumping up one additional block
         const PLAYER_GRAVITY = 0.5;
+        const JUMP_CUT_DAMPING = 0.5;  // Multiplier for velocity on early jump release (0-1, lower = shorter hop)
 
         const GRID_SIZE = 20;  // Reduced from 30 to detect more platforms (1x player size)
         const BRIGHTNESS_THRESHOLD = 140;  // Increased from 128 to require brighter areas for platforms
@@ -829,12 +857,13 @@
         let camera = {
             x: 0,
             y: 0,
-            zoom: 1.0,
+            zoom: 0.5,
             minZoom: 0.5,
             maxZoom: 2.0,
             smoothing: 0.1,  // Camera follow smoothing (0-1, lower = smoother)
             targetX: 0,
-            targetY: 0
+            targetY: 0,
+            autoFitZoom: 0.5  // Computed in updateZoomLimits() to fit the world in the viewport
         };
         
         // Pre-computed shortest word for fallback (safe with non-empty dictionary)
@@ -998,6 +1027,7 @@
                 this.jumpPower = getScaledPlayerJumpPower();
                 this.gravity = getScaledPlayerGravity();
                 this.onGround = false;
+                this.jumpCutAllowed = false;  // Variable jump: true while rising and cut is possible
                 this.lastPositionTime = Date.now();
                 this.lastX = x;
                 this.lastY = y;
@@ -1016,12 +1046,18 @@
                     this.velocityX *= 0.7; // Reduced friction for more responsive feel
                 }
 
-                // Jumping
+                // Jumping - variable height: hold for full jump, tap for short hop
                 if ((keys['ArrowUp'] || keys['w'] || keys['W'] || keys[' '] || touchJumping) && this.onGround) {
                     this.velocityY = -this.jumpPower;
                     this.onGround = false;
+                    this.jumpCutAllowed = true;  // Enable jump cut until apex or key release
                     touchJumping = false; // Reset touch jump
                     this.lastPositionTime = Date.now(); // Reset stuck timer on input
+                }
+
+                // Clear jump cut when player starts falling (reached apex)
+                if (this.velocityY >= 0) {
+                    this.jumpCutAllowed = false;
                 }
 
                 // Apply gravity
@@ -2653,12 +2689,14 @@
             // Reset camera
             camera.x = 0;
             camera.y = 0;
-            camera.zoom = 1.0;
             camera.targetX = 0;
             camera.targetY = 0;
             
-            // Resize canvas to fill the container/viewport
+            // Resize canvas to fill the container/viewport (also computes autoFitZoom)
             resizeCanvas();
+            
+            // Set zoom to auto-fit so the world fills the screen
+            camera.zoom = camera.autoFitZoom;
             
             // Enter fullscreen when game starts
             enterFullscreen();
@@ -2669,9 +2707,17 @@
         // Resize canvas to fill viewport
         function resizeCanvas() {
             const container = document.querySelector('.game-canvas-container');
-            const rect = container.getBoundingClientRect();
-            canvas.width = rect.width;
-            canvas.height = rect.height;
+            const isFullscreen = container.classList.contains('fullscreen');
+            
+            if (isFullscreen) {
+                // Use full viewport for maximum canvas area
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            } else {
+                const rect = container.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+            }
             
             // Update minimum zoom to ensure entire world can be viewed
             updateZoomLimits();
@@ -2687,6 +2733,10 @@
             // Set minZoom to be slightly less than fit-to-world to ensure full visibility
             camera.minZoom = Math.max(0.1, minZoomToFitWorld * 0.95);
             camera.maxZoom = 2.0;  // Keep max zoom fixed
+            
+            // Auto-fit zoom: shows the world filling the viewport
+            // Uses the fit-to-world zoom, clamped between minZoom and maxZoom
+            camera.autoFitZoom = Math.max(camera.minZoom, Math.min(minZoomToFitWorld, camera.maxZoom));
         }
 
         // Update camera to follow player
@@ -3397,9 +3447,9 @@
                 e.preventDefault();
                 return;
             }
-            // Reset zoom with '0'
+            // Reset zoom with '0' — snaps to auto-fit level
             if (e.key === '0') {
-                camera.zoom = 1.0;
+                camera.zoom = camera.autoFitZoom;
                 e.preventDefault();
                 return;
             }
@@ -3450,6 +3500,14 @@
 
         document.addEventListener('keyup', (e) => {
             if (shouldIgnoreGameKeyEvent(e)) return;
+            
+            // Variable jump: cut the jump short on early release
+            if ((e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W' || e.key === ' ') 
+                && player && player.jumpCutAllowed && player.velocityY < 0) {
+                player.velocityY *= JUMP_CUT_DAMPING;
+                player.jumpCutAllowed = false;
+            }
+            
             keys[e.key] = false;
         });
 
@@ -3492,6 +3550,11 @@
             touchJumping = false;
             keys['ArrowLeft'] = false;
             keys['ArrowRight'] = false;
+            // Variable jump: cut the jump short on early release
+            if (player && player.jumpCutAllowed && player.velocityY < 0) {
+                player.velocityY *= JUMP_CUT_DAMPING;
+                player.jumpCutAllowed = false;
+            }
         });
 
         // Mobile control button handlers
@@ -3536,10 +3599,20 @@
         jumpBtn.addEventListener('touchend', (e) => {
             e.preventDefault();
             touchJumping = false;
+            // Variable jump: cut the jump short on early release
+            if (player && player.jumpCutAllowed && player.velocityY < 0) {
+                player.velocityY *= JUMP_CUT_DAMPING;
+                player.jumpCutAllowed = false;
+            }
         });
         jumpBtn.addEventListener('touchcancel', (e) => {
             e.preventDefault();
             touchJumping = false;
+            // Also cut jump on touch cancel
+            if (player && player.jumpCutAllowed && player.velocityY < 0) {
+                player.velocityY *= JUMP_CUT_DAMPING;
+                player.jumpCutAllowed = false;
+            }
         });
 
         // Zoom control buttons
@@ -3555,7 +3628,35 @@
 
         zoomResetBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            camera.zoom = 1.0;
+            camera.zoom = camera.autoFitZoom;
+        });
+
+        // Respawn button (R)
+        respawnBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (player && gameRunning) player.respawn();
+        });
+        respawnBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (player && gameRunning) player.respawn();
+        });
+
+        // Regenerate level button (G)
+        regenBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (backgroundImage && gameRunning) {
+                console.log('Regenerating level...');
+                gameRunning = false;
+                setTimeout(() => { processImage(backgroundImage); }, 50);
+            }
+        });
+        regenBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (backgroundImage && gameRunning) {
+                console.log('Regenerating level...');
+                gameRunning = false;
+                setTimeout(() => { processImage(backgroundImage); }, 50);
+            }
         });
 
         // Touch support for zoom buttons
@@ -3571,7 +3672,7 @@
 
         zoomResetBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
-            camera.zoom = 1.0;
+            camera.zoom = camera.autoFitZoom;
         });
 
         document.addEventListener('keydown', (e) => {
