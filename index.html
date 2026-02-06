@@ -2676,14 +2676,27 @@
                 for (const gridPlatform of gridBasedPlatforms) {
                     let shouldSkip = false;
                     for (const mlPlatform of mlPlatforms) {
-                        // Check for horizontal overlap first
-                        const horizontalOverlap = !(gridPlatform.x + gridPlatform.width <= mlPlatform.x ||
-                            gridPlatform.x >= mlPlatform.x + mlPlatform.width);
+                        // Check for horizontal overlap - platforms must actually overlap, not just touch
+                        const horizontalOverlap = !(gridPlatform.x + gridPlatform.width < mlPlatform.x ||
+                            gridPlatform.x > mlPlatform.x + mlPlatform.width);
                         
                         if (horizontalOverlap) {
-                            // Only skip if platforms are very close vertically (would create confusing stack)
-                            const verticalDistance = Math.abs(gridPlatform.y - mlPlatform.y);
-                            if (verticalDistance < ML_PLATFORM_OVERLAP_TOLERANCE_Y) {
+                            // Calculate actual vertical gap between platform edges (not just top positions)
+                            // This handles platforms of different heights correctly
+                            const gridBottom = gridPlatform.y + gridPlatform.height;
+                            const mlBottom = mlPlatform.y + mlPlatform.height;
+                            
+                            let verticalGap;
+                            if (gridPlatform.y > mlPlatform.y) {
+                                // Grid platform is below ML platform
+                                verticalGap = gridPlatform.y - mlBottom;
+                            } else {
+                                // Grid platform is above ML platform
+                                verticalGap = mlPlatform.y - gridBottom;
+                            }
+                            
+                            // Only skip if platforms are very close or overlapping vertically
+                            if (verticalGap < ML_PLATFORM_OVERLAP_TOLERANCE_Y) {
                                 shouldSkip = true;
                                 break;
                             }
