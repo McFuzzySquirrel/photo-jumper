@@ -62,3 +62,41 @@ Photo Jumper uses a single `index.html` with all CSS, HTML, and JS inline. Exter
 ### Risks
 - File grows large — use clear section comments and consistent structure
 - Editing requires careful context matching due to file size
+
+## Post-BFS Feature Placement
+### Context
+When a feature depends on knowing which platforms are reachable from which (e.g., wall blocks, decorations, enemy placement).
+### Implementation Notes
+- Place the feature in the pipeline AFTER `addHelperPlatformsIfNeeded()` but BEFORE coordinate scaling
+- At that point, all platforms (grid, ML, helpers) are finalized and BFS has validated reachability
+- Use `canReachPlatform(from, to, limits)` pairwise to build neighbor relationships
+- Check both directions: `canReachPlatform(a, b)` and `canReachPlatform(b, a)` for bidirectional paths (jump-up and drop-down)
+- Use process coordinates (not yet scaled to world coordinates)
+### Risks
+- Must run before scaling — process coordinates and world coordinates differ by `scaleX/scaleY`
+- O(n²) pairwise check is fine with max 50 platforms but could matter if platform count grows
+- `processWidth`/`processHeight` must be accessible in the function scope (closure inside `processImage`)
+
+## Camera Centering for Viewport-Exceeds-World
+### Context
+When the viewport (canvas / zoom) is larger than the game world in one or both dimensions.
+### Implementation Notes
+- Branch the clamping logic: if `viewportWidth >= worldWidth`, use `camera.x = -(viewportWidth - worldWidth) / 2`
+- Same for Y axis independently
+- When viewport fits within world, use normal clamping: `Math.max(0, Math.min(camera.x, worldWidth - viewportWidth))`
+- Negative camera values are valid — they mean the world starts offset from the canvas edge
+### Risks
+- Drawing outside world bounds now shows the letterbox color — must clear canvas with a dark color first
+- Sky-blue fill must be drawn explicitly inside world bounds after the camera transform
+
+## Dark Letterbox Framing
+### Context
+When the game world doesn't fill the entire viewport (different aspect ratios, zoomed out).
+### Implementation Notes
+- Clear entire canvas with dark color (`#1a1a2e`) — this becomes the letterbox
+- After applying camera transform (`ctx.scale` + `ctx.translate`), fill `(0, 0, worldWidth, worldHeight)` with sky blue (`#87ceeb`)
+- Draw the photo on top of the sky-blue fill
+- Order: dark clear → camera transform → sky fill → photo → platforms → player
+### Risks
+- The sky-blue fill must use world coordinates (after camera transform), not screen coordinates
+- If camera centering is off, the sky-blue rect won't align with the photo
