@@ -1783,6 +1783,10 @@
             previewCtx.drawImage(image, 0, 0, processWidth, processHeight);
             const imageData = previewCtx.getImageData(0, 0, processWidth, processHeight);
             const data = imageData.data;
+            
+            // For convenience in nested functions, create width/height aliases
+            const width = processWidth;
+            const height = processHeight;
 
             // Create platforms based on brightness and edge detection
             platforms = [];
