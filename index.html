@@ -456,7 +456,7 @@
             background: rgba(0, 0, 0, 0.85);
             padding: 8px 15px;
             border-radius: 6px;
-            border: 2px solid #FFD700;
+            border: 1px solid #FFD700;
             font-family: Arial, sans-serif;
             display: flex;
             align-items: center;
@@ -1248,14 +1248,14 @@
                     const blockX = this.x + (i * blockSize);
                     const blockY = this.y;
                     
-                    // Main block fill
+                    // Main block fill (square blocks)
                     ctx.fillStyle = this.color;
-                    ctx.fillRect(blockX, blockY, blockSize, this.height);
+                    ctx.fillRect(blockX, blockY, blockSize, blockSize);
                     
                     // Block outline
                     ctx.strokeStyle = '#000';
                     ctx.lineWidth = 2;
-                    ctx.strokeRect(blockX, blockY, blockSize, this.height);
+                    ctx.strokeRect(blockX, blockY, blockSize, blockSize);
                     
                     // Top highlight for each block
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
@@ -1273,11 +1273,11 @@
                     const blockY = this.y;
                     
                     ctx.fillStyle = this.color;
-                    ctx.fillRect(blockX, blockY, remainingWidth, this.height);
+                    ctx.fillRect(blockX, blockY, remainingWidth, blockSize);
                     
                     ctx.strokeStyle = '#000';
                     ctx.lineWidth = 2;
-                    ctx.strokeRect(blockX, blockY, remainingWidth, this.height);
+                    ctx.strokeRect(blockX, blockY, remainingWidth, blockSize);
                 }
                 
                 // Reset shadow
