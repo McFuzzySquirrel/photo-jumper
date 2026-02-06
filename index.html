@@ -2686,17 +2686,19 @@
                             const gridBottom = gridPlatform.y + gridPlatform.height;
                             const mlBottom = mlPlatform.y + mlPlatform.height;
                             
-                            let verticalGap;
+                            // Calculate vertical separation (positive = separated, negative = overlapping)
+                            let verticalSeparation;
                             if (gridPlatform.y > mlPlatform.y) {
                                 // Grid platform is below ML platform
-                                verticalGap = gridPlatform.y - mlBottom;
+                                verticalSeparation = gridPlatform.y - mlBottom;
                             } else {
                                 // Grid platform is above ML platform
-                                verticalGap = mlPlatform.y - gridBottom;
+                                verticalSeparation = mlPlatform.y - gridBottom;
                             }
                             
                             // Only skip if platforms are very close or overlapping vertically
-                            if (verticalGap < ML_PLATFORM_OVERLAP_TOLERANCE_Y) {
+                            // (negative or small positive values indicate they're too close)
+                            if (verticalSeparation < ML_PLATFORM_OVERLAP_TOLERANCE_Y) {
                                 shouldSkip = true;
                                 break;
                             }
