@@ -427,10 +427,10 @@
         }
 
         .game-canvas-container.fullscreen #gameCanvas {
-            width: 100vw;
-            height: 100vh;
             max-width: 100vw;
             max-height: 100vh;
+            width: auto;
+            height: auto;
             border-radius: 0;
         }
 
@@ -766,6 +766,10 @@
         let gameRunning = false;
         let platforms = [];
         let player = null;
+        
+        // World dimensions (actual photo size in game world coordinates)
+        let worldWidth = 800;
+        let worldHeight = 600;
         let goal = null;  // Goal object for animation tracking
         let goalPlatform = null;  // The platform that acts as the goal
         let playerSpawnY = 0;  // Calculated spawn Y position
@@ -946,10 +950,10 @@
 
                 // Boundary checks
                 if (this.x < 0) this.x = 0;
-                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
+                if (this.x + this.width > worldWidth) this.x = worldWidth - this.width;
 
                 // Check if player fell off
-                if (this.y > canvas.height) {
+                if (this.y > worldHeight) {
                     this.respawn();
                 }
 
@@ -975,7 +979,7 @@
 
                 // Update score based on progress and time efficiency
                 // Score = platforms reached * 100 - time penalty
-                const heightProgress = Math.max(0, Math.floor((canvas.height - this.y) / 10));
+                const heightProgress = Math.max(0, Math.floor((worldHeight - this.y) / 10));
                 const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
                 const timePenalty = Math.floor(elapsedSeconds / 2); // -1 point every 2 seconds
                 const currentScore = Math.max(0, heightProgress * 2 - timePenalty);
@@ -1749,30 +1753,40 @@
             // Store the image for background rendering
             backgroundImage = image;
 
-            // Set canvas size based on image aspect ratio
-            const maxWidth = 800;
-            const maxHeight = 600;
-            let width = image.width;
-            let height = image.height;
+            // Store the original image dimensions as the world size
+            // This allows the photo to be rendered at full resolution in game world
+            worldWidth = image.width;
+            worldHeight = image.height;
 
-            if (width > maxWidth) {
-                height = (height * maxWidth) / width;
-                width = maxWidth;
+            // For platform detection, we'll use the actual image size
+            // (We'll limit processing size for performance, but world coords use full size)
+            const maxProcessWidth = 1600;  // Increased from 800 to preserve more detail
+            const maxProcessHeight = 1200; // Increased from 600 to preserve more detail
+            let processWidth = image.width;
+            let processHeight = image.height;
+
+            // Scale down only if image is very large (for performance)
+            if (processWidth > maxProcessWidth) {
+                processHeight = (processHeight * maxProcessWidth) / processWidth;
+                processWidth = maxProcessWidth;
             }
-            if (height > maxHeight) {
-                width = (width * maxHeight) / height;
-                height = maxHeight;
+            if (processHeight > maxProcessHeight) {
+                processWidth = (processWidth * maxProcessHeight) / processHeight;
+                processHeight = maxProcessHeight;
             }
 
-            canvas.width = width;
-            canvas.height = height;
-            previewCanvas.width = width;
-            previewCanvas.height = height;
+            // Set preview canvas to processing size for platform detection
+            previewCanvas.width = processWidth;
+            previewCanvas.height = processHeight;
 
-            // Draw image to preview canvas
-            previewCtx.drawImage(image, 0, 0, width, height);
-            const imageData = previewCtx.getImageData(0, 0, width, height);
+            // Draw image to preview canvas for platform detection
+            previewCtx.drawImage(image, 0, 0, processWidth, processHeight);
+            const imageData = previewCtx.getImageData(0, 0, processWidth, processHeight);
             const data = imageData.data;
+            
+            // For convenience in nested functions, create width/height aliases
+            const width = processWidth;
+            const height = processHeight;
 
             // Create platforms based on brightness and edge detection
             platforms = [];
@@ -2372,6 +2386,25 @@
             const limits = getJumpLimits();
             addHelperPlatformsIfNeeded(startPlatform, goalPlatform, platforms, limits);
 
+            // Scale all platforms from process coordinates to world coordinates
+            const scaleX = worldWidth / processWidth;
+            const scaleY = worldHeight / processHeight;
+            
+            for (let platform of platforms) {
+                platform.x *= scaleX;
+                platform.y *= scaleY;
+                platform.width *= scaleX;
+                platform.height *= scaleY;
+            }
+            
+            // Scale goal position
+            if (goal) {
+                goal.x *= scaleX;
+                goal.y *= scaleY;
+                goal.width *= scaleX;
+                goal.height *= scaleY;
+            }
+
             // Place collectible letters on platforms (pass limits and startPlatform for reachability check)
             placeLettersOnPlatforms(startPlatform, limits);
 
@@ -2492,8 +2525,8 @@
             camera.targetX = 0;
             camera.targetY = 0;
             
-            // Note: Canvas dimensions are set in processImage() based on image aspect ratio
-            // Don't call resizeCanvas() here as it would override those dimensions
+            // Resize canvas to fill the container/viewport
+            resizeCanvas();
             
             // Enter fullscreen when game starts
             enterFullscreen();
@@ -2507,6 +2540,21 @@
             const rect = container.getBoundingClientRect();
             canvas.width = rect.width;
             canvas.height = rect.height;
+            
+            // Update minimum zoom to ensure entire world can be viewed
+            updateZoomLimits();
+        }
+        
+        // Calculate and update zoom limits based on world and canvas size
+        function updateZoomLimits() {
+            // Calculate minimum zoom so entire world fits in viewport
+            const zoomToFitWidth = canvas.width / worldWidth;
+            const zoomToFitHeight = canvas.height / worldHeight;
+            const minZoomToFitWorld = Math.min(zoomToFitWidth, zoomToFitHeight);
+            
+            // Set minZoom to be slightly less than fit-to-world to ensure full visibility
+            camera.minZoom = Math.max(0.1, minZoomToFitWorld * 0.95);
+            camera.maxZoom = 2.0;  // Keep max zoom fixed
         }
 
         // Update camera to follow player
@@ -2521,11 +2569,11 @@
             camera.x += (camera.targetX - camera.x) * camera.smoothing;
             camera.y += (camera.targetY - camera.y) * camera.smoothing;
             
-            // Clamp camera to level bounds
+            // Clamp camera to world bounds (not canvas bounds)
             const viewportWidth = canvas.width / camera.zoom;
             const viewportHeight = canvas.height / camera.zoom;
-            camera.x = Math.max(0, Math.min(camera.x, canvas.width - viewportWidth));
-            camera.y = Math.max(0, Math.min(camera.y, canvas.height - viewportHeight));
+            camera.x = Math.max(0, Math.min(camera.x, worldWidth - viewportWidth));
+            camera.y = Math.max(0, Math.min(camera.y, worldHeight - viewportHeight));
         }
 
         // Main game loop
@@ -2548,7 +2596,7 @@
 
             // Draw the photo as background in world space (so it zooms with camera)
             if (backgroundImage) {
-                ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+                ctx.drawImage(backgroundImage, 0, 0, worldWidth, worldHeight);
             }
 
             // Update and draw goal
