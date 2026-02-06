@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head><title>Create Large Test Image</title></head>
+<body>
+<canvas id="c" width="1600" height="1200"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// Sky blue background
+ctx.fillStyle = '#87CEEB';
+ctx.fillRect(0, 0, 1600, 1200);
+
+// Draw platforms as dark brown rectangles (scaled 2x from original)
+ctx.fillStyle = '#654321';
+
+// Bottom platforms
+ctx.fillRect(100, 1100, 300, 60);
+ctx.fillRect(600, 1100, 300, 60);
+ctx.fillRect(1100, 1100, 300, 60);
+
+// Mid-level platforms
+ctx.fillRect(200, 900, 240, 60);
+ctx.fillRect(700, 840, 260, 60);
+ctx.fillRect(1200, 880, 220, 60);
+
+// Upper-mid platforms
+ctx.fillRect(160, 640, 280, 60);
+ctx.fillRect(600, 600, 240, 60);
+ctx.fillRect(1040, 660, 260, 60);
+
+// High platforms
+ctx.fillRect(300, 400, 240, 60);
+ctx.fillRect(800, 360, 220, 60);
+ctx.fillRect(1200, 420, 200, 60);
+
+// Very high platforms
+ctx.fillRect(400, 200, 200, 60);
+ctx.fillRect(900, 160, 220, 60);
+ctx.fillRect(1300, 240, 180, 60);
+
+// Convert to data URL and trigger download
+canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'test-large.png';
+    a.click();
+    document.body.innerHTML = '<h1>Large image created! Check your downloads.</h1>';
+});
+</script>
+</body>
+</html>

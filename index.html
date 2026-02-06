@@ -447,6 +447,62 @@
             display: none;
         }
 
+        /* Word bar - positioned in letterbox area above canvas */
+        .word-bar {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 101;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 8px 15px;
+            border-radius: 6px;
+            border: 1px solid #FFD700;
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .word-label {
+            color: #FFF;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .word-letters {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .word-letter {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .word-letter.collected {
+            background: #FFD700;
+            color: #000;
+        }
+
+        .word-letter.uncollected {
+            background: #555;
+            color: #AAA;
+        }
+
+        .word-progress {
+            color: #FFD700;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
         /* Position game info overlay when fullscreen */
         .game-canvas-container.fullscreen ~ .game-info,
         .game-screen:has(.game-canvas-container.fullscreen) .game-info {
@@ -577,6 +633,13 @@
             Score: <span id="score">0</span> | Time: <span id="time">0</span>s
         </div>
 
+        <!-- Word collection bar - positioned above canvas in letterbox area -->
+        <div class="word-bar" id="wordBar" style="display: none;">
+            <span class="word-label">Word:</span>
+            <span class="word-letters" id="wordLetters"></span>
+            <span class="word-progress" id="wordProgress"></span>
+        </div>
+
         <div class="game-canvas-container">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <canvas id="previewCanvas" class="preview-canvas"></canvas>
@@ -670,6 +733,11 @@
         const gameInfo = document.getElementById('gameInfo');
         const scoreElement = document.getElementById('score');
         const timeElement = document.getElementById('time');
+        
+        // Word bar elements
+        const wordBar = document.getElementById('wordBar');
+        const wordLetters = document.getElementById('wordLetters');
+        const wordProgress = document.getElementById('wordProgress');
 
         const feedbackModal = document.getElementById('feedbackModal');
         const feedbackForm = document.getElementById('feedbackForm');
@@ -741,10 +809,21 @@
         const COLLECTIBLE_LETTER_OFFSET_RATIO = 0.4;  // Ratio of platform width for random offset
         const COLLECTIBLE_LETTER_MAX_OFFSET = 30;  // Maximum horizontal offset in pixels
         const COLLECTIBLE_LETTER_VERTICAL_OFFSET = 10;  // Pixels above platform
+        const COLLECTIBLE_LETTER_FONT_SIZE_RATIO = 0.8;  // Font size as ratio of letter width
         const WORD_COMPLETE_BONUS = 50;  // Bonus for collecting all letters
         const CORRECT_ORDER_BONUS = 100;  // Extra bonus for correct order
         const WORD_DICTIONARY = ['JUMP', 'PLAY', 'GAME', 'PHOTO', 'STAR', 'GOAL', 'WIN', 'FUN'];
         const MAX_GOAL_CANDIDATES = 3;  // Number of top goal platform candidates to randomly select from
+        
+        // Player scaling constants
+        const BASE_WORLD_WIDTH = 800;  // Reference world width for player scaling
+        const BASE_PLAYER_SIZE = 20;   // Reference player size at base world width
+        const MIN_PLAYER_SIZE = 16;    // Minimum player size regardless of world size
+        const PLAYER_EYE_SIZE_RATIO = 0.2;      // Eye size as ratio of player width
+        const PLAYER_EYE_Y_RATIO = 0.25;        // Eye Y position as ratio of player height
+        const PLAYER_LEFT_EYE_X_RATIO = 0.2;    // Left eye X position as ratio of player width
+        const PLAYER_RIGHT_EYE_X_RATIO = 0.6;   // Right eye X position as ratio of player width
+        const PLAYER_PUPIL_SIZE_RATIO = 0.5;    // Pupil size as ratio of eye size
         
         // Camera and viewport constants
         let camera = {
@@ -869,18 +948,55 @@
         let onnxLoadError = null;
         let debugDetectedObjects = [];
 
+        // Calculate scaled block size - all visual elements scale with world dimensions
+        // This ensures consistent visual scale across different photo sizes
+        function getScaledBlockSize() {
+            return (worldWidth / BASE_WORLD_WIDTH) * BLOCK_SIZE;
+        }
+
+        // Calculate player size - should always match scaled block size for consistent scale with platforms
+        function getScaledPlayerSize() {
+            return getScaledBlockSize();  // Scales with world to match platform block size
+        }
+
+        // Calculate player speed scaled to world dimensions
+        // Speed must scale proportionally so movement feels consistent across world sizes
+        function getScaledPlayerSpeed() {
+            return (worldWidth / BASE_WORLD_WIDTH) * PLAYER_SPEED;
+        }
+
+        // Calculate player jump power scaled to world dimensions
+        // Jump power must scale proportionally so jumping feels consistent across world sizes
+        function getScaledPlayerJumpPower() {
+            return (worldWidth / BASE_WORLD_WIDTH) * PLAYER_JUMP_POWER;
+        }
+
+        // Calculate player gravity scaled to world dimensions
+        // Gravity must scale proportionally to match jump physics
+        function getScaledPlayerGravity() {
+            return (worldWidth / BASE_WORLD_WIDTH) * PLAYER_GRAVITY;
+        }
+
+        // Calculate scaled letter size - scales with world for visibility
+        function getScaledLetterSize() {
+            return (worldWidth / BASE_WORLD_WIDTH) * COLLECTIBLE_LETTER_SIZE;
+        }
+
         // Player class
         class Player {
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.width = PLAYER_SIZE;
-                this.height = PLAYER_SIZE;
+                // Use scaled player size based on world dimensions
+                const playerSize = getScaledPlayerSize();
+                this.width = playerSize;
+                this.height = playerSize;
                 this.velocityX = 0;
                 this.velocityY = 0;
-                this.speed = PLAYER_SPEED;
-                this.jumpPower = PLAYER_JUMP_POWER;
-                this.gravity = PLAYER_GRAVITY;
+                // Scale speed, jump power, and gravity to match world size
+                this.speed = getScaledPlayerSpeed();
+                this.jumpPower = getScaledPlayerJumpPower();
+                this.gravity = getScaledPlayerGravity();
                 this.onGround = false;
                 this.lastPositionTime = Date.now();
                 this.lastX = x;
@@ -1020,14 +1136,21 @@
                 ctx.lineWidth = 2;
                 ctx.strokeRect(this.x, this.y, this.width, this.height);
                 
-                // Draw eyes (adjusted for smaller size)
-                ctx.fillStyle = 'white';
-                ctx.fillRect(this.x + 4, this.y + 5, 4, 4);
-                ctx.fillRect(this.x + 12, this.y + 5, 4, 4);
+                // Draw eyes (scaled proportionally to player size using constants)
+                const eyeSize = Math.max(2, Math.floor(this.width * PLAYER_EYE_SIZE_RATIO));
+                const eyeY = this.y + Math.floor(this.height * PLAYER_EYE_Y_RATIO);
+                const leftEyeX = this.x + Math.floor(this.width * PLAYER_LEFT_EYE_X_RATIO);
+                const rightEyeX = this.x + Math.floor(this.width * PLAYER_RIGHT_EYE_X_RATIO);
                 
+                ctx.fillStyle = 'white';
+                ctx.fillRect(leftEyeX, eyeY, eyeSize, eyeSize);
+                ctx.fillRect(rightEyeX, eyeY, eyeSize, eyeSize);
+                
+                const pupilSize = Math.max(1, Math.floor(eyeSize * PLAYER_PUPIL_SIZE_RATIO));
+                const pupilOffset = Math.floor((eyeSize - pupilSize) / 2);
                 ctx.fillStyle = 'black';
-                ctx.fillRect(this.x + 5, this.y + 6, 2, 2);
-                ctx.fillRect(this.x + 13, this.y + 6, 2, 2);
+                ctx.fillRect(leftEyeX + pupilOffset, eyeY + pupilOffset, pupilSize, pupilSize);
+                ctx.fillRect(rightEyeX + pupilOffset, eyeY + pupilOffset, pupilSize, pupilSize);
             }
         }
 
@@ -1036,8 +1159,9 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.width = BLOCK_SIZE;   // Portal is one block wide
-                this.height = BLOCK_SIZE * 2;  // Portal is 2 blocks tall
+                const blockSize = getScaledBlockSize();
+                this.width = blockSize;   // Portal is one block wide
+                this.height = blockSize * 2;  // Portal is 2 blocks tall
                 this.animation = 0;
             }
 
@@ -1116,43 +1240,44 @@
                 }
                 
                 // Draw platforms as a series of connected square blocks
-                const numBlocks = Math.floor(this.width / BLOCK_SIZE);
+                const blockSize = getScaledBlockSize();
+                const numBlocks = Math.floor(this.width / blockSize);
                 
                 // Draw individual blocks
                 for (let i = 0; i < numBlocks; i++) {
-                    const blockX = this.x + (i * BLOCK_SIZE);
+                    const blockX = this.x + (i * blockSize);
                     const blockY = this.y;
                     
-                    // Main block fill
+                    // Main block fill (square blocks)
                     ctx.fillStyle = this.color;
-                    ctx.fillRect(blockX, blockY, BLOCK_SIZE, this.height);
+                    ctx.fillRect(blockX, blockY, blockSize, blockSize);
                     
                     // Block outline
                     ctx.strokeStyle = '#000';
                     ctx.lineWidth = 2;
-                    ctx.strokeRect(blockX, blockY, BLOCK_SIZE, this.height);
+                    ctx.strokeRect(blockX, blockY, blockSize, blockSize);
                     
                     // Top highlight for each block
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
                     ctx.lineWidth = 1;
                     ctx.beginPath();
                     ctx.moveTo(blockX + 1, blockY + 1);
-                    ctx.lineTo(blockX + BLOCK_SIZE - 1, blockY + 1);
+                    ctx.lineTo(blockX + blockSize - 1, blockY + 1);
                     ctx.stroke();
                 }
                 
                 // Handle remaining width (partial block at end)
-                const remainingWidth = this.width - (numBlocks * BLOCK_SIZE);
+                const remainingWidth = this.width - (numBlocks * blockSize);
                 if (remainingWidth > 0) {
-                    const blockX = this.x + (numBlocks * BLOCK_SIZE);
+                    const blockX = this.x + (numBlocks * blockSize);
                     const blockY = this.y;
                     
                     ctx.fillStyle = this.color;
-                    ctx.fillRect(blockX, blockY, remainingWidth, this.height);
+                    ctx.fillRect(blockX, blockY, remainingWidth, blockSize);
                     
                     ctx.strokeStyle = '#000';
                     ctx.lineWidth = 2;
-                    ctx.strokeRect(blockX, blockY, remainingWidth, this.height);
+                    ctx.strokeRect(blockX, blockY, remainingWidth, blockSize);
                 }
                 
                 // Reset shadow
@@ -1167,8 +1292,9 @@
                 this.char = char;
                 this.x = x;
                 this.y = y;
-                this.width = COLLECTIBLE_LETTER_SIZE;
-                this.height = COLLECTIBLE_LETTER_SIZE;
+                const letterSize = getScaledLetterSize();
+                this.width = letterSize;
+                this.height = letterSize;
                 this.collected = false;
                 this.index = index;  // Position in the target word
                 this.animation = 0;
@@ -1200,7 +1326,7 @@
                 ctx.shadowBlur = 10;
                 ctx.fillStyle = '#FFD700';
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, COLLECTIBLE_LETTER_SIZE / 2, 0, Math.PI * 2);
+                ctx.arc(centerX, centerY, this.width / 2, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Reset shadow
@@ -1211,12 +1337,13 @@
                 ctx.strokeStyle = '#000';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.arc(centerX, centerY, COLLECTIBLE_LETTER_SIZE / 2, 0, Math.PI * 2);
+                ctx.arc(centerX, centerY, this.width / 2, 0, Math.PI * 2);
                 ctx.stroke();
 
-                // Draw the letter
+                // Draw the letter (scale font size with letter size)
                 ctx.fillStyle = '#000';
-                ctx.font = 'bold 16px Arial';
+                const fontSize = Math.max(12, Math.floor(this.width * COLLECTIBLE_LETTER_FONT_SIZE_RATIO));
+                ctx.font = `bold ${fontSize}px Arial`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(this.char, centerX, centerY);
@@ -1585,10 +1712,11 @@
                 const platformY = y;
                 const platformX = x;
                 
-                // Align width to block boundaries
-                const blockCount = Math.max(2, Math.ceil(w / BLOCK_SIZE));  // At least 2 blocks
-                const platformWidth = blockCount * BLOCK_SIZE;
-                const platformHeight = BLOCK_SIZE;  // One block tall
+                // Align width to block boundaries (use scaled block size)
+                const blockSize = getScaledBlockSize();
+                const blockCount = Math.max(2, Math.ceil(w / blockSize));  // At least 2 blocks
+                const platformWidth = blockCount * blockSize;
+                const platformHeight = blockSize;  // One block tall
                 
                 // Skip if platform would be in reserved areas
                 const isStartArea = (platformX < START_AREA_WIDTH && platformY > canvasHeight - START_AREA_HEIGHT);
@@ -1669,9 +1797,9 @@
         }
 
         function getJumpLimits() {
-            const jumpPower = PLAYER_JUMP_POWER;
-            const gravity = PLAYER_GRAVITY;
-            const speed = PLAYER_SPEED;
+            const jumpPower = getScaledPlayerJumpPower();
+            const gravity = getScaledPlayerGravity();
+            const speed = getScaledPlayerSpeed();
 
             const maxJumpUp = (jumpPower * jumpPower) / (2 * gravity);
             const maxHangTime = (2 * jumpPower) / gravity;
@@ -1935,38 +2063,39 @@
                 if (current) merged.push(current);
 
                 // Convert to platform objects with block-aligned dimensions
+                const blockSize = getScaledBlockSize();
                 const platformsOut = [];
                 for (const m of merged) {
                     if (m.width < PLATFORM_MIN_WIDTH) continue;
                     
                     // Align platform width to block boundaries for clean appearance
-                    const blockCount = Math.ceil(m.width / BLOCK_SIZE);
-                    const alignedWidth = blockCount * BLOCK_SIZE;
+                    const blockCount = Math.ceil(m.width / blockSize);
+                    const alignedWidth = blockCount * blockSize;
                     
-                    const platformHeight = BLOCK_SIZE;  // One block tall
+                    const platformHeight = blockSize;  // One block tall
                     const color = platformColorFromBrightness(m.brightness);
                     const mainPlatform = new Platform(m.x, m.y, Math.min(alignedWidth, width - m.x), platformHeight, color, 'photo');
                     platformsOut.push(mainPlatform);
                     
                     // Add wall blocks at the ends of platforms for better climbing
                     // Left wall block
-                    if (m.x >= BLOCK_SIZE && mainPlatform.width >= BLOCK_SIZE * 3) {
+                    if (m.x >= blockSize && mainPlatform.width >= blockSize * 3) {
                         platformsOut.push(new Platform(
                             m.x, 
-                            m.y - BLOCK_SIZE, 
-                            BLOCK_SIZE, 
-                            BLOCK_SIZE, 
+                            m.y - blockSize, 
+                            blockSize, 
+                            blockSize, 
                             color, 
                             'photo'
                         ));
                     }
                     // Right wall block
-                    if (mainPlatform.x + mainPlatform.width + BLOCK_SIZE <= width && mainPlatform.width >= BLOCK_SIZE * 3) {
+                    if (mainPlatform.x + mainPlatform.width + blockSize <= width && mainPlatform.width >= blockSize * 3) {
                         platformsOut.push(new Platform(
-                            mainPlatform.x + mainPlatform.width - BLOCK_SIZE, 
-                            m.y - BLOCK_SIZE, 
-                            BLOCK_SIZE, 
-                            BLOCK_SIZE, 
+                            mainPlatform.x + mainPlatform.width - blockSize, 
+                            m.y - blockSize, 
+                            blockSize, 
+                            blockSize, 
                             color, 
                             'photo'
                         ));
@@ -2023,9 +2152,10 @@
                     return;
                 }
 
-                // Use smaller, more flexible helper blocks
-                const helperWidthOptions = [BLOCK_SIZE * 2, BLOCK_SIZE * 3];  // Try smallest first: 40px, 60px
-                const helperHeight = BLOCK_SIZE;
+                // Use smaller, more flexible helper blocks (scaled with world)
+                const blockSize = getScaledBlockSize();
+                const helperWidthOptions = [blockSize * 2, blockSize * 3];  // Try smallest first
+                const helperHeight = blockSize;
                 const helperColor = 'rgba(80, 120, 255, 0.9)';
 
                 let current = startPlatform;
@@ -2074,7 +2204,7 @@
                         }
                         
                         // Try shifting left and right with current width - more aggressive range
-                        for (let offset = BLOCK_SIZE; offset <= BLOCK_SIZE * 15; offset += BLOCK_SIZE) {
+                        for (let offset = blockSize; offset <= blockSize * 15; offset += blockSize) {
                             const leftX = Math.max(0, targetX - offset);
                             const rightX = Math.min(width - helperWidth, targetX + offset);
 
@@ -2104,9 +2234,9 @@
                         // Try stepping horizontally at same height
                         for (let stepMultiplier = 2; stepMultiplier <= 5; stepMultiplier++) {
                             const horizontalHelper = new Platform(
-                                currentCenter + toward * (BLOCK_SIZE * stepMultiplier), 
+                                currentCenter + toward * (blockSize * stepMultiplier), 
                                 current.y, 
-                                BLOCK_SIZE * 2, 
+                                blockSize * 2, 
                                 helperHeight, 
                                 helperColor, 
                                 'helper'
@@ -2129,9 +2259,9 @@
                         // Try going down to create descending path
                         for (let stepMultiplier = 1; stepMultiplier <= 3; stepMultiplier++) {
                             const downHelper = new Platform(
-                                currentCenter + toward * stepX - BLOCK_SIZE,
+                                currentCenter + toward * stepX - blockSize,
                                 Math.min(height - helperHeight - 20, current.y + (stepUp * stepMultiplier)),
-                                BLOCK_SIZE * 2,
+                                blockSize * 2,
                                 helperHeight,
                                 helperColor,
                                 'helper'
@@ -2154,18 +2284,18 @@
                     if (!placed) {
                         // Last resort: very small steps in multiple directions
                         const closeSteps = [
-                            { x: BLOCK_SIZE * 1.5, y: -BLOCK_SIZE * 1.5 },  // diagonal up-forward
-                            { x: BLOCK_SIZE * 2, y: -BLOCK_SIZE },          // forward-up
-                            { x: BLOCK_SIZE * 1, y: -BLOCK_SIZE * 2 },      // up-forward
-                            { x: BLOCK_SIZE * 2, y: 0 },                    // straight forward
-                            { x: BLOCK_SIZE * 1.5, y: BLOCK_SIZE },         // forward-down
+                            { x: blockSize * 1.5, y: -blockSize * 1.5 },  // diagonal up-forward
+                            { x: blockSize * 2, y: -blockSize },          // forward-up
+                            { x: blockSize * 1, y: -blockSize * 2 },      // up-forward
+                            { x: blockSize * 2, y: 0 },                    // straight forward
+                            { x: blockSize * 1.5, y: blockSize },         // forward-down
                         ];
                         
                         for (const step of closeSteps) {
                             const closeHelper = new Platform(
                                 currentCenter + (toward * step.x),
                                 current.y + step.y,
-                                BLOCK_SIZE * 2,
+                                blockSize * 2,
                                 helperHeight,
                                 helperColor,
                                 'helper'
@@ -2279,9 +2409,10 @@
             // Add a ground platform at the bottom (darker and more opaque)
             platforms.push(new Platform(0, height - 20, width, 20, 'rgba(100, 60, 20, 0.8)', 'ground'));
 
-            // Add starting platform (green to indicate start, 5 blocks wide)
+            // Add starting platform (green to indicate start, scaled with world)
+            const blockSize = getScaledBlockSize();
             const startPlatformY = height - 60;
-            const startPlatform = new Platform(10, startPlatformY, BLOCK_SIZE * 5, BLOCK_SIZE, 'rgba(0, 180, 0, 0.9)', 'start');
+            const startPlatform = new Platform(10, startPlatformY, blockSize * 5, blockSize, 'rgba(0, 180, 0, 0.9)', 'start');
             platforms.push(startPlatform);
 
             // Randomly select a goal location from suitable platforms
@@ -2317,31 +2448,31 @@
                 const topCandidates = candidateGoalPlatforms.slice(0, Math.min(MAX_GOAL_CANDIDATES, candidateGoalPlatforms.length));
                 const selectedPlatform = topCandidates[Math.floor(Math.random() * topCandidates.length)];
                 
-                // Create goal support platform
+                // Create goal support platform (use scaled block size)
                 // Ensure platform is low enough that portal above it will be visible
-                const minPlatformY = WORD_BAR_AREA_HEIGHT + (BLOCK_SIZE * 2) + 10;  // Room for portal above
-                const platformY = Math.max(minPlatformY, selectedPlatform.y - BLOCK_SIZE);
+                const minPlatformY = WORD_BAR_AREA_HEIGHT + (blockSize * 2) + 10;  // Room for portal above
+                const platformY = Math.max(minPlatformY, selectedPlatform.y - blockSize);
                 
                 goalPlatform = new Platform(
-                    selectedPlatform.x + selectedPlatform.width / 2 - (BLOCK_SIZE * 1.5),
+                    selectedPlatform.x + selectedPlatform.width / 2 - (blockSize * 1.5),
                     platformY,
-                    BLOCK_SIZE * 3, 
-                    BLOCK_SIZE, 
+                    blockSize * 3, 
+                    blockSize, 
                     'rgba(255, 200, 0, 0.9)', 
                     'goal'
                 );
             } else {
                 // Fallback to safe position if no suitable platforms found
-                const goalX = width - (BLOCK_SIZE * 4);  // Ensure it's not too close to edge
-                const goalY = WORD_BAR_AREA_HEIGHT + (BLOCK_SIZE * 2) + 20;  // Low enough for portal to be above
-                goalPlatform = new Platform(goalX, goalY, BLOCK_SIZE * 3, BLOCK_SIZE, 'rgba(255, 200, 0, 0.9)', 'goal');
+                const goalX = width - (blockSize * 4);  // Ensure it's not too close to edge
+                const goalY = WORD_BAR_AREA_HEIGHT + (blockSize * 2) + 20;  // Low enough for portal to be above
+                goalPlatform = new Platform(goalX, goalY, blockSize * 3, blockSize, 'rgba(255, 200, 0, 0.9)', 'goal');
             }
             
             platforms.push(goalPlatform);
             
-            // Create portal on top of goal platform
-            const portalX = goalPlatform.x + (goalPlatform.width / 2) - (BLOCK_SIZE / 2);  // Center on platform
-            const portalY = goalPlatform.y - (BLOCK_SIZE * 2);  // Portal sits on top of platform
+            // Create portal on top of goal platform (use scaled block size)
+            const portalX = goalPlatform.x + (goalPlatform.width / 2) - (blockSize / 2);  // Center on platform
+            const portalY = goalPlatform.y - (blockSize * 2);  // Portal sits on top of platform
             
             goal = new Goal(portalX, portalY);
             
@@ -2489,13 +2620,14 @@
                 }
                 
                 // Place letter on top of platform, centered with some randomness
+                const letterSize = getScaledLetterSize();
                 const platformCenterX = platform.x + platform.width / 2;
                 const randomOffsetX = (Math.random() - 0.5) * Math.min(
                     platform.width * COLLECTIBLE_LETTER_OFFSET_RATIO, 
                     COLLECTIBLE_LETTER_MAX_OFFSET
                 );
-                const letterX = platformCenterX + randomOffsetX - COLLECTIBLE_LETTER_SIZE / 2;
-                const letterY = platform.y - COLLECTIBLE_LETTER_SIZE - COLLECTIBLE_LETTER_VERTICAL_OFFSET;
+                const letterX = platformCenterX + randomOffsetX - letterSize / 2;
+                const letterY = platform.y - letterSize - COLLECTIBLE_LETTER_VERTICAL_OFFSET;
                 
                 letters.push(new Letter(targetWord[i], letterX, letterY, i));
             }
@@ -2826,70 +2958,28 @@
             ctx.restore();
         }
 
-        // Draw collected letters display at the top of the screen
+        // Update word bar HTML element with collected letters
         function drawCollectedLetters() {
-            if (letters.length === 0) return;
-            
-            ctx.save();
-            
-            // Calculate panel width based on content
-            const letterSpacing = 25;
-            const panelPadding = 20;
-            const labelWidth = 60;
-            const progressWidth = 40;
-            const panelWidth = labelWidth + (targetWord.length * letterSpacing) + progressWidth + panelPadding;
-            
-            // Draw background panel (compact, left-aligned)
-            const panelHeight = 35;
-            const panelY = 10;
-            const panelX = 10;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-            
-            // Draw label
-            ctx.fillStyle = '#FFF';
-            ctx.font = 'bold 13px Arial';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('Word:', panelX + 10, panelY + panelHeight / 2);
-            
-            // Draw target word letters
-            const startX = panelX + labelWidth;
-            ctx.font = 'bold 16px Arial';
-            ctx.textAlign = 'center';
-            
-            // Create a Set of collected indices for O(1) lookup during rendering
-            const collectedIndices = new Set(collectedLetters.map(l => l.index));
-            
-            for (let i = 0; i < targetWord.length; i++) {
-                const x = startX + i * letterSpacing;
-                const y = panelY + panelHeight / 2;
-                
-                // Check if this letter has been collected
-                const collected = collectedIndices.has(i);
-                
-                // Draw letter circle
-                if (collected) {
-                    ctx.fillStyle = '#FFD700';
-                } else {
-                    ctx.fillStyle = '#555';
-                }
-                ctx.beginPath();
-                ctx.arc(x, y, 9, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Draw letter
-                ctx.fillStyle = collected ? '#000' : '#AAA';
-                ctx.fillText(targetWord[i], x, y);
+            if (letters.length === 0) {
+                wordBar.style.display = 'none';
+                return;
             }
             
-            // Draw collection progress
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'right';
-            ctx.fillStyle = '#FFD700';
-            ctx.fillText(`${collectedLetters.length}/${targetWord.length}`, panelX + panelWidth - 10, panelY + panelHeight / 2);
+            wordBar.style.display = 'flex';
             
-            ctx.restore();
+            // Create a Set of collected indices for O(1) lookup
+            const collectedIndices = new Set(collectedLetters.map(l => l.index));
+            
+            // Build the letters HTML
+            let lettersHTML = '';
+            for (let i = 0; i < targetWord.length; i++) {
+                const collected = collectedIndices.has(i);
+                const className = collected ? 'word-letter collected' : 'word-letter uncollected';
+                lettersHTML += `<span class="${className}">${targetWord[i]}</span>`;
+            }
+            
+            wordLetters.innerHTML = lettersHTML;
+            wordProgress.textContent = `${collectedLetters.length}/${targetWord.length}`;
         }
 
         // Draw win message overlay
@@ -2989,6 +3079,7 @@
             backgroundImage = null; // Clear background image
             canvas.style.display = 'none';
             gameInfo.style.display = 'none';
+            wordBar.style.display = 'none';  // Hide word bar
             resetBtn.style.display = 'none';
             uploadBtn.style.display = 'inline-block';
             cameraBtn.style.display = 'inline-block';
