@@ -37,30 +37,8 @@
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             padding: 30px;
-            max-width: 1100px;
+            max-width: 900px;
             width: 100%;
-        }
-
-        /* Two-column layout for intro and game screens */
-        .two-col {
-            display: flex;
-            gap: 40px;
-            align-items: center;
-        }
-
-        .two-col .col-image {
-            flex: 0 0 280px;
-            text-align: center;
-        }
-
-        .two-col .col-image .game-logo {
-            max-width: 100%;
-            margin-bottom: 0;
-        }
-
-        .two-col .col-content {
-            flex: 1;
-            min-width: 0;
         }
 
         h1 {
@@ -405,14 +383,6 @@
             margin-right: auto;
         }
 
-        .game-logo-sm {
-            max-width: 80px;
-            border-radius: 10px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            vertical-align: middle;
-            margin-right: 12px;
-        }
-
         /* Splash screen styles */
         .splash-screen {
             text-align: center;
@@ -554,8 +524,8 @@
         }
 
         .game-canvas-container.fullscreen #gameCanvas {
-            width: 100vw;
-            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
             border-radius: 0;
             position: relative;
             z-index: 1;
@@ -571,10 +541,6 @@
         }
 
         .game-screen:has(.game-canvas-container.fullscreen) h1 {
-            display: none;
-        }
-
-        .game-screen:has(.game-canvas-container.fullscreen) .two-col {
             display: none;
         }
 
@@ -682,21 +648,6 @@
             border-color: #FFD700;
         }
 
-        @media (max-width: 768px) {
-            .two-col {
-                flex-direction: column;
-                gap: 20px;
-            }
-
-            .two-col .col-image {
-                flex: none;
-                width: 100%;
-            }
-
-            .two-col .col-image .game-logo {
-                max-width: 180px;
-            }
-        }
 
         @media (max-width: 600px) {
             h1 {
@@ -729,49 +680,37 @@
         <!-- Splash Screen -->
         <div class="splash-screen" id="splashScreen">
             <img src="images/photo-jumper-sq.png" alt="Photo Jumper" class="game-logo">
-            <h1 class="splash-title">Photo Jumper</h1>
+            
             <p class="splash-subtitle">Turn your photos into playable levels</p>
             <button class="splash-btn" id="splashPlayBtn">Let's Jump!</button>
         </div>
 
         <!-- Intro Screen -->
         <div class="intro-screen hidden" id="introScreen">
-            <div class="two-col">
-                <div class="col-image">
-                    <img src="images/photo-jumper-sq.png" alt="Photo Jumper" class="game-logo">
+            <h1>Photo Jumper</h1>
+            <p class="tagline">Turn your photos into playable platformer levels!</p>
+            
+            <div class="features">
+                <div class="feature">
+                    <h3>📸 Upload or Capture</h3>
+                    <p>Use any photo - the game detects edges and brightness to create platforms</p>
                 </div>
-                <div class="col-content">
-                    
-                    <p class="tagline">Turn your photos into playable platformer levels!</p>
-                    
-                    <div class="features">
-                        <div class="feature">
-                            <h3>📸 Upload or Capture</h3>
-                            <p>Use any photo - the game detects edges and brightness to create platforms</p>
-                        </div>
-                        <div class="feature">
-                            <h3>🎯 Reach the Goal</h3>
-                            <p>Jump from platform to platform to reach the golden portal</p>
-                        </div>
-                        <div class="feature">
-                            <h3>⚡ Fast & Fun</h3>
-                            <p>Quick platformer action with responsive controls</p>
-                        </div>
-                    </div>
-
-                    <button class="cta-button" id="startGameBtn">Get Started</button>
+                <div class="feature">
+                    <h3>🎯 Reach the Goal</h3>
+                    <p>Jump from platform to platform to reach the golden portal</p>
+                </div>
+                <div class="feature">
+                    <h3>⚡ Fast & Fun</h3>
+                    <p>Quick platformer action with responsive controls</p>
                 </div>
             </div>
+
+            <button class="cta-button" id="startGameBtn">Get Started</button>
         </div>
 
         <!-- Game Screen -->
         <div class="game-screen" id="gameScreen">
-            <div class="two-col">
-                <div class="col-image">
-                    <img src="images/photo-jumper-sq.png" alt="Photo Jumper" class="game-logo">
-                </div>
-                <div class="col-content">
-                    
+            <h1>Photo Jumper</h1>
             
             <div class="upload-section">
             <div class="button-group">
@@ -795,8 +734,6 @@
             <input type="file" id="fileInput" accept="image/*">
             <input type="file" id="cameraInput" accept="image/*" capture="environment">
         </div>
-                </div><!-- /.col-content -->
-            </div><!-- /.two-col -->
 
         <div class="game-info" id="gameInfo">
             Score: <span id="score">0</span> | Time: <span id="time">0</span>s
@@ -2912,6 +2849,114 @@
             // block jump paths — edges facing a reachable neighbor stay clear.
             addWallBlocks(platforms, limits);
 
+            // Alternative-path pass: sprinkle minimal single-block stepping stones
+            // to connect isolated platform clusters. This gives the player more
+            // routes through the level without flooding it with helpers.
+            (function addAlternativePathHelpers() {
+                const blockSize = getScaledBlockSize();
+                const helperColor = 'rgba(80, 120, 255, 0.7)';
+                const traversable = platforms.filter(p => p.kind !== 'wall');
+                
+                // Find all platforms reachable from start
+                const reachableSet = new Set();
+                const queue = [startPlatform];
+                reachableSet.add(startPlatform);
+                while (queue.length) {
+                    const cur = queue.shift();
+                    for (const next of traversable) {
+                        if (reachableSet.has(next)) continue;
+                        if (!canReachPlatform(cur, next, limits, traversable)) continue;
+                        reachableSet.add(next);
+                        queue.push(next);
+                    }
+                }
+                
+                // Collect unreachable photo/ML platforms worth connecting
+                const unreachable = traversable.filter(p =>
+                    !reachableSet.has(p) &&
+                    (p.kind === 'photo' || p.kind === 'ml') &&
+                    p.width >= blockSize * 2
+                );
+                
+                if (unreachable.length === 0) return;
+                
+                let added = 0;
+                const maxAltHelpers = 8; // Keep it minimal
+                
+                for (const target of unreachable) {
+                    if (added >= maxAltHelpers) break;
+                    
+                    // Find the closest reachable platform to this unreachable one
+                    let bestFrom = null;
+                    let bestDist = Infinity;
+                    for (const rp of reachableSet) {
+                        const dx = (rp.x + rp.width / 2) - (target.x + target.width / 2);
+                        const dy = rp.y - target.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < bestDist) {
+                            bestDist = dist;
+                            bestFrom = rp;
+                        }
+                    }
+                    if (!bestFrom) continue;
+                    
+                    // Only bridge gaps that are within ~2 jump distances
+                    if (bestDist > limits.maxJumpDx * 2.5) continue;
+                    
+                    // Try placing a single stepping-stone block midway
+                    const midX = (bestFrom.x + bestFrom.width / 2 + target.x + target.width / 2) / 2 - blockSize / 2;
+                    const midY = Math.min(bestFrom.y, target.y) - limits.maxJumpUp * 0.3;
+                    const clampedY = Math.max(WORD_BAR_AREA_HEIGHT, Math.min(midY, height - blockSize * 2));
+                    const clampedX = Math.max(0, Math.min(midX, width - blockSize));
+                    
+                    const stone = new Platform(clampedX, clampedY, blockSize, blockSize, helperColor, 'helper');
+                    
+                    if (!overlapsAny(stone, platforms)) {
+                        // Verify the stone actually helps: reachable from existing set AND can reach target
+                        const canGetToStone = [...reachableSet].some(rp => canReachPlatform(rp, stone, limits, platforms));
+                        const canGetFromStone = canReachPlatform(stone, target, limits, platforms);
+                        
+                        if (canGetToStone && canGetFromStone) {
+                            platforms.push(stone);
+                            debugHelperPlatforms.push(stone);
+                            reachableSet.add(stone);
+                            reachableSet.add(target);
+                            added++;
+                            console.log(`Alt-path stone at (${Math.round(clampedX)}, ${Math.round(clampedY)}) connects to platform at y=${Math.round(target.y)}`);
+                            continue;
+                        }
+                    }
+                    
+                    // Fallback: try a 2-block wide stone at a few Y offsets
+                    const offsets = [0, -blockSize, blockSize, -blockSize * 2];
+                    let placed = false;
+                    for (const yOff of offsets) {
+                        const altY = Math.max(WORD_BAR_AREA_HEIGHT, Math.min(clampedY + yOff, height - blockSize * 2));
+                        const altStone = new Platform(clampedX, altY, blockSize * 2, blockSize, helperColor, 'helper');
+                        
+                        if (!overlapsAny(altStone, platforms)) {
+                            const canGet = [...reachableSet].some(rp => canReachPlatform(rp, altStone, limits, platforms));
+                            const canLeave = canReachPlatform(altStone, target, limits, platforms);
+                            
+                            if (canGet && canLeave) {
+                                platforms.push(altStone);
+                                debugHelperPlatforms.push(altStone);
+                                reachableSet.add(altStone);
+                                reachableSet.add(target);
+                                added++;
+                                placed = true;
+                                console.log(`Alt-path 2-block stone at (${Math.round(clampedX)}, ${Math.round(altY)}) connects to platform at y=${Math.round(target.y)}`);
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (added > 0) {
+                    console.log(`Added ${added} alternative-path stepping stones`);
+                }
+            })();
+
             // Scale all platforms from process coordinates to world coordinates
             const scaleX = worldWidth / processWidth;
             const scaleY = worldHeight / processHeight;
@@ -3094,9 +3139,22 @@
             const isFullscreen = container.classList.contains('fullscreen');
             
             if (isFullscreen) {
-                // Use full viewport for maximum canvas area
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
+                // Fit canvas to photo aspect ratio within the viewport.
+                // Letterbox margins show the frosted-glass ::before background.
+                const vw = window.innerWidth;
+                const vh = window.innerHeight;
+                const photoAspect = worldWidth / worldHeight;
+                const screenAspect = vw / vh;
+                
+                if (screenAspect > photoAspect) {
+                    // Screen is wider than photo — pillarbox (bars on sides)
+                    canvas.height = vh;
+                    canvas.width = Math.round(vh * photoAspect);
+                } else {
+                    // Screen is taller than photo — letterbox (bars top/bottom)
+                    canvas.width = vw;
+                    canvas.height = Math.round(vw / photoAspect);
+                }
             } else {
                 const rect = container.getBoundingClientRect();
                 canvas.width = rect.width;
@@ -3119,8 +3177,8 @@
             camera.minZoom = Math.max(0.1, minZoomToFitWorld * 0.95);
             camera.maxZoom = 2.0;
             
-            // Default zoom fills the viewport (no letterbox) — camera pans to show content
-            camera.autoFitZoom = Math.max(camera.minZoom, Math.min(fillZoom, camera.maxZoom));
+            // Default zoom fits the photo in the canvas — frosted letterbox shows around edges
+            camera.autoFitZoom = Math.max(camera.minZoom, Math.min(minZoomToFitWorld, camera.maxZoom));
         }
 
         // Update camera to follow player
@@ -3409,11 +3467,11 @@
         // Draw win message overlay
         function drawWinMessage() {
             // Calculate message height based on content
-            let messageHeight = 100;
+            let messageHeight = 80;
             let yOffset = 0;
             
             if (collectedLetters.length === targetWord.length) {
-                messageHeight = 180;
+                messageHeight = 160;
             }
             
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
@@ -3447,11 +3505,9 @@
                 yOffset = 0;
             }
             
-            ctx.font = '20px Arial';
-            ctx.fillStyle = '#FFF';
-            ctx.fillText(`Time: ${Math.floor((Date.now() - startTime) / 1000)}s`, canvas.width / 2, canvas.height / 2 + yOffset + 30);
             ctx.font = '16px Arial';
-            ctx.fillText('Press ESC or click "Exit Game" to return to start', canvas.width / 2, canvas.height / 2 + yOffset + 55);
+            ctx.fillStyle = '#FFF';
+            ctx.fillText('Press ESC or click "Exit Game" to return to start', canvas.width / 2, canvas.height / 2 + yOffset + 30);
         }
 
         // Show intro screen (from splash or back from game)
