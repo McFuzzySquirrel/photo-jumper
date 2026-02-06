@@ -869,13 +869,25 @@
         let onnxLoadError = null;
         let debugDetectedObjects = [];
 
+        // Calculate player size scaled to world dimensions to ensure consistent gameplay
+        // Player should be approximately 2.5% of world width (20px for 800px world)
+        function getScaledPlayerSize() {
+            const baseWorldWidth = 800;  // Reference world width
+            const basePlayerSize = 20;   // Reference player size
+            const scaledSize = Math.round((worldWidth / baseWorldWidth) * basePlayerSize);
+            // Ensure player size is at least 16px and matches BLOCK_SIZE scaling
+            return Math.max(16, scaledSize);
+        }
+
         // Player class
         class Player {
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.width = PLAYER_SIZE;
-                this.height = PLAYER_SIZE;
+                // Use scaled player size based on world dimensions
+                const playerSize = getScaledPlayerSize();
+                this.width = playerSize;
+                this.height = playerSize;
                 this.velocityX = 0;
                 this.velocityY = 0;
                 this.speed = PLAYER_SPEED;
@@ -1020,14 +1032,20 @@
                 ctx.lineWidth = 2;
                 ctx.strokeRect(this.x, this.y, this.width, this.height);
                 
-                // Draw eyes (adjusted for smaller size)
-                ctx.fillStyle = 'white';
-                ctx.fillRect(this.x + 4, this.y + 5, 4, 4);
-                ctx.fillRect(this.x + 12, this.y + 5, 4, 4);
+                // Draw eyes (scaled proportionally to player size)
+                const eyeSize = Math.max(2, Math.floor(this.width / 5));
+                const eyeY = this.y + Math.floor(this.height / 4);
+                const leftEyeX = this.x + Math.floor(this.width / 5);
+                const rightEyeX = this.x + Math.floor(this.width * 3 / 5);
                 
+                ctx.fillStyle = 'white';
+                ctx.fillRect(leftEyeX, eyeY, eyeSize, eyeSize);
+                ctx.fillRect(rightEyeX, eyeY, eyeSize, eyeSize);
+                
+                const pupilSize = Math.max(1, Math.floor(eyeSize / 2));
                 ctx.fillStyle = 'black';
-                ctx.fillRect(this.x + 5, this.y + 6, 2, 2);
-                ctx.fillRect(this.x + 13, this.y + 6, 2, 2);
+                ctx.fillRect(leftEyeX + Math.floor(pupilSize / 2), eyeY + Math.floor(pupilSize / 2), pupilSize, pupilSize);
+                ctx.fillRect(rightEyeX + Math.floor(pupilSize / 2), eyeY + Math.floor(pupilSize / 2), pupilSize, pupilSize);
             }
         }
 
@@ -2845,6 +2863,11 @@
             const panelX = 10;
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
             ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+            
+            // Draw prominent border around the word bar to make it always visible
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
             
             // Draw label
             ctx.fillStyle = '#FFF';
