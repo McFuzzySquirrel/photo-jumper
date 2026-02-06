@@ -1,21 +1,8 @@
- Exploring Ideas Through Code: One Experiment at a Time
 
-## About These Projects
+ 
+# About this branch
+This is a starter branch, the game has a lot of issues and can be used to if you want to follow a similar journey based on collabortive feedback, planning and critical thinking.
 
-All of my projects exist for one main reason: **learning through experimentation**.  
-Each repository is a result of me asking questions like:  
-> “Is this possible?”  
-> “I wonder if…?”  
-
-Sometimes they’re attempts to solve real problems I’ve come across, other times they’re just me following curiosity down a rabbit hole.  
-This is my **learning playground**, a space where I test ideas, try new things, and learn by doing.  
-
-I share them here in case they help or inspire someone else.  
-So expect some projects to be **messy**, others **well-structured**, all of them are honest reflections of learning in progress.  
-
-Feel free to **use**, **modify**, or **build on** anything here. 
-
-So here we go:
 
 # What this is
 
@@ -53,7 +40,7 @@ A web-based platform jumping game that converts your photos into playable levels
 
 | Before (main) | After (learning/journey) |
 | --- | --- |
-| <img src="docs/adr/screenshots/before-main.png" alt="Before (main)" width="360" /> | <img src="https://github.com/McFuzzySquirrel/photo-jumper/blob/learning/journey/docs/adr/screenshots/after-journey-02.png" alt="After (learning/journey)" width="360" /> |
+| <img src="docs/adr/screenshots/before-main.png" alt="Before (main)" width="360" /> | Put your image here! |
 
 
 
