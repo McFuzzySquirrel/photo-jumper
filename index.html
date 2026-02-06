@@ -746,6 +746,16 @@
         const WORD_DICTIONARY = ['JUMP', 'PLAY', 'GAME', 'PHOTO', 'STAR', 'GOAL', 'WIN', 'FUN'];
         const MAX_GOAL_CANDIDATES = 3;  // Number of top goal platform candidates to randomly select from
         
+        // Player scaling constants
+        const BASE_WORLD_WIDTH = 800;  // Reference world width for player scaling
+        const BASE_PLAYER_SIZE = 20;   // Reference player size at base world width
+        const MIN_PLAYER_SIZE = 16;    // Minimum player size regardless of world size
+        const PLAYER_EYE_SIZE_RATIO = 0.2;      // Eye size as ratio of player width
+        const PLAYER_EYE_Y_RATIO = 0.25;        // Eye Y position as ratio of player height
+        const PLAYER_LEFT_EYE_X_RATIO = 0.2;    // Left eye X position as ratio of player width
+        const PLAYER_RIGHT_EYE_X_RATIO = 0.6;   // Right eye X position as ratio of player width
+        const PLAYER_PUPIL_SIZE_RATIO = 0.5;    // Pupil size as ratio of eye size
+        
         // Camera and viewport constants
         let camera = {
             x: 0,
@@ -870,13 +880,11 @@
         let debugDetectedObjects = [];
 
         // Calculate player size scaled to world dimensions to ensure consistent gameplay
-        // Player should be approximately 2.5% of world width (20px for 800px world)
+        // Player should be approximately 2.5% of world width for consistent gameplay feel
         function getScaledPlayerSize() {
-            const baseWorldWidth = 800;  // Reference world width
-            const basePlayerSize = 20;   // Reference player size
-            const scaledSize = Math.round((worldWidth / baseWorldWidth) * basePlayerSize);
-            // Ensure player size is at least 16px and matches BLOCK_SIZE scaling
-            return Math.max(16, scaledSize);
+            const scaledSize = Math.round((worldWidth / BASE_WORLD_WIDTH) * BASE_PLAYER_SIZE);
+            // Ensure player size is at least MIN_PLAYER_SIZE for visibility
+            return Math.max(MIN_PLAYER_SIZE, scaledSize);
         }
 
         // Player class
@@ -1032,20 +1040,21 @@
                 ctx.lineWidth = 2;
                 ctx.strokeRect(this.x, this.y, this.width, this.height);
                 
-                // Draw eyes (scaled proportionally to player size)
-                const eyeSize = Math.max(2, Math.floor(this.width / 5));
-                const eyeY = this.y + Math.floor(this.height / 4);
-                const leftEyeX = this.x + Math.floor(this.width / 5);
-                const rightEyeX = this.x + Math.floor(this.width * 3 / 5);
+                // Draw eyes (scaled proportionally to player size using constants)
+                const eyeSize = Math.max(2, Math.floor(this.width * PLAYER_EYE_SIZE_RATIO));
+                const eyeY = this.y + Math.floor(this.height * PLAYER_EYE_Y_RATIO);
+                const leftEyeX = this.x + Math.floor(this.width * PLAYER_LEFT_EYE_X_RATIO);
+                const rightEyeX = this.x + Math.floor(this.width * PLAYER_RIGHT_EYE_X_RATIO);
                 
                 ctx.fillStyle = 'white';
                 ctx.fillRect(leftEyeX, eyeY, eyeSize, eyeSize);
                 ctx.fillRect(rightEyeX, eyeY, eyeSize, eyeSize);
                 
-                const pupilSize = Math.max(1, Math.floor(eyeSize / 2));
+                const pupilSize = Math.max(1, Math.floor(eyeSize * PLAYER_PUPIL_SIZE_RATIO));
+                const pupilOffset = Math.floor((eyeSize - pupilSize) / 2);
                 ctx.fillStyle = 'black';
-                ctx.fillRect(leftEyeX + Math.floor(pupilSize / 2), eyeY + Math.floor(pupilSize / 2), pupilSize, pupilSize);
-                ctx.fillRect(rightEyeX + Math.floor(pupilSize / 2), eyeY + Math.floor(pupilSize / 2), pupilSize, pupilSize);
+                ctx.fillRect(leftEyeX + pupilOffset, eyeY + pupilOffset, pupilSize, pupilSize);
+                ctx.fillRect(rightEyeX + pupilOffset, eyeY + pupilOffset, pupilSize, pupilSize);
             }
         }
 
