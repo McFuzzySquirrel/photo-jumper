@@ -1,3 +1,6 @@
+ <img src="images/photo-jumper-sq.png" alt="Before (main)" width="20%" />
+ 
+ 
  Exploring Ideas Through Code: One Experiment at a Time
 
 ## About These Projects
