@@ -447,6 +447,62 @@
             display: none;
         }
 
+        /* Word bar - positioned in letterbox area above canvas */
+        .word-bar {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 101;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 8px 15px;
+            border-radius: 6px;
+            border: 2px solid #FFD700;
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .word-label {
+            color: #FFF;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .word-letters {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .word-letter {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .word-letter.collected {
+            background: #FFD700;
+            color: #000;
+        }
+
+        .word-letter.uncollected {
+            background: #555;
+            color: #AAA;
+        }
+
+        .word-progress {
+            color: #FFD700;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
         /* Position game info overlay when fullscreen */
         .game-canvas-container.fullscreen ~ .game-info,
         .game-screen:has(.game-canvas-container.fullscreen) .game-info {
@@ -577,6 +633,13 @@
             Score: <span id="score">0</span> | Time: <span id="time">0</span>s
         </div>
 
+        <!-- Word collection bar - positioned above canvas in letterbox area -->
+        <div class="word-bar" id="wordBar" style="display: none;">
+            <span class="word-label">Word:</span>
+            <span class="word-letters" id="wordLetters"></span>
+            <span class="word-progress" id="wordProgress"></span>
+        </div>
+
         <div class="game-canvas-container">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <canvas id="previewCanvas" class="preview-canvas"></canvas>
@@ -670,6 +733,11 @@
         const gameInfo = document.getElementById('gameInfo');
         const scoreElement = document.getElementById('score');
         const timeElement = document.getElementById('time');
+        
+        // Word bar elements
+        const wordBar = document.getElementById('wordBar');
+        const wordLetters = document.getElementById('wordLetters');
+        const wordProgress = document.getElementById('wordProgress');
 
         const feedbackModal = document.getElementById('feedbackModal');
         const feedbackForm = document.getElementById('feedbackForm');
@@ -879,12 +947,10 @@
         let onnxLoadError = null;
         let debugDetectedObjects = [];
 
-        // Calculate player size scaled to world dimensions to ensure consistent gameplay
-        // Player should be approximately 2.5% of world width for consistent gameplay feel
+        // Calculate player size - should always match BLOCK_SIZE for consistent scale with platforms
+        // Player size does NOT scale with world - it stays at BLOCK_SIZE (20px)
         function getScaledPlayerSize() {
-            const scaledSize = Math.round((worldWidth / BASE_WORLD_WIDTH) * BASE_PLAYER_SIZE);
-            // Ensure player size is at least MIN_PLAYER_SIZE for visibility
-            return Math.max(MIN_PLAYER_SIZE, scaledSize);
+            return BLOCK_SIZE;  // Always 20px to match platform block size
         }
 
         // Calculate player speed scaled to world dimensions
@@ -2872,75 +2938,28 @@
             ctx.restore();
         }
 
-        // Draw collected letters display at the top of the screen
+        // Update word bar HTML element with collected letters
         function drawCollectedLetters() {
-            if (letters.length === 0) return;
-            
-            ctx.save();
-            
-            // Calculate panel width based on content
-            const letterSpacing = 25;
-            const panelPadding = 20;
-            const labelWidth = 60;
-            const progressWidth = 40;
-            const panelWidth = labelWidth + (targetWord.length * letterSpacing) + progressWidth + panelPadding;
-            
-            // Draw background panel (compact, left-aligned)
-            const panelHeight = 35;
-            const panelY = 10;
-            const panelX = 10;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
-            
-            // Draw prominent border around the word bar to make it always visible
-            ctx.strokeStyle = '#FFD700';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
-            
-            // Draw label
-            ctx.fillStyle = '#FFF';
-            ctx.font = 'bold 13px Arial';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('Word:', panelX + 10, panelY + panelHeight / 2);
-            
-            // Draw target word letters
-            const startX = panelX + labelWidth;
-            ctx.font = 'bold 16px Arial';
-            ctx.textAlign = 'center';
-            
-            // Create a Set of collected indices for O(1) lookup during rendering
-            const collectedIndices = new Set(collectedLetters.map(l => l.index));
-            
-            for (let i = 0; i < targetWord.length; i++) {
-                const x = startX + i * letterSpacing;
-                const y = panelY + panelHeight / 2;
-                
-                // Check if this letter has been collected
-                const collected = collectedIndices.has(i);
-                
-                // Draw letter circle
-                if (collected) {
-                    ctx.fillStyle = '#FFD700';
-                } else {
-                    ctx.fillStyle = '#555';
-                }
-                ctx.beginPath();
-                ctx.arc(x, y, 9, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Draw letter
-                ctx.fillStyle = collected ? '#000' : '#AAA';
-                ctx.fillText(targetWord[i], x, y);
+            if (letters.length === 0) {
+                wordBar.style.display = 'none';
+                return;
             }
             
-            // Draw collection progress
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'right';
-            ctx.fillStyle = '#FFD700';
-            ctx.fillText(`${collectedLetters.length}/${targetWord.length}`, panelX + panelWidth - 10, panelY + panelHeight / 2);
+            wordBar.style.display = 'flex';
             
-            ctx.restore();
+            // Create a Set of collected indices for O(1) lookup
+            const collectedIndices = new Set(collectedLetters.map(l => l.index));
+            
+            // Build the letters HTML
+            let lettersHTML = '';
+            for (let i = 0; i < targetWord.length; i++) {
+                const collected = collectedIndices.has(i);
+                const className = collected ? 'word-letter collected' : 'word-letter uncollected';
+                lettersHTML += `<span class="${className}">${targetWord[i]}</span>`;
+            }
+            
+            wordLetters.innerHTML = lettersHTML;
+            wordProgress.textContent = `${collectedLetters.length}/${targetWord.length}`;
         }
 
         // Draw win message overlay
@@ -3040,6 +3059,7 @@
             backgroundImage = null; // Clear background image
             canvas.style.display = 'none';
             gameInfo.style.display = 'none';
+            wordBar.style.display = 'none';  // Hide word bar
             resetBtn.style.display = 'none';
             uploadBtn.style.display = 'inline-block';
             cameraBtn.style.display = 'inline-block';
