@@ -1,4 +1,4 @@
-# This is **your** Leanning Jounrey
+# This is **Your** Learning Jounrey
  
 ## About this branch
 This is a starter branch, the game has a lot of issues and can be used to if you want to follow a similar journey based on collabortive feedback, planning and critical thinking.
