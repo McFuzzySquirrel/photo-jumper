@@ -150,7 +150,7 @@
             border: 3px solid #333;
             border-radius: 10px;
             max-width: 100%;
-            background: #87ceeb;
+            background: #1a1a2e;
             display: none;
         }
 
@@ -449,10 +449,8 @@
         }
 
         .game-canvas-container.fullscreen #gameCanvas {
-            max-width: 100vw;
-            max-height: 100vh;
-            width: auto;
-            height: auto;
+            width: 100%;
+            height: 100%;
             border-radius: 0;
         }
 
@@ -1880,6 +1878,8 @@
         }
 
         function isReachable(startPlatform, goalPlatform, allPlatforms, limits) {
+            // Filter out wall blocks — they are solid collision obstacles, not traversal nodes
+            const traversable = allPlatforms.filter(p => p.kind !== 'wall');
             const visited = new Set();
             const queue = [startPlatform];
             visited.add(startPlatform);
@@ -1888,7 +1888,7 @@
                 const current = queue.shift();
                 if (current === goalPlatform) return true;
 
-                for (const next of allPlatforms) {
+                for (const next of traversable) {
                     if (visited.has(next)) continue;
                     if (!canReachPlatform(current, next, limits)) continue;
                     visited.add(next);
@@ -2112,30 +2112,7 @@
                     const color = platformColorFromBrightness(m.brightness);
                     const mainPlatform = new Platform(m.x, m.y, Math.min(alignedWidth, width - m.x), platformHeight, color, 'photo');
                     platformsOut.push(mainPlatform);
-                    
-                    // Add wall blocks at the ends of platforms for better climbing
-                    // Left wall block
-                    if (m.x >= blockSize && mainPlatform.width >= blockSize * 3) {
-                        platformsOut.push(new Platform(
-                            m.x, 
-                            m.y - blockSize, 
-                            blockSize, 
-                            blockSize, 
-                            color, 
-                            'photo'
-                        ));
-                    }
-                    // Right wall block
-                    if (mainPlatform.x + mainPlatform.width + blockSize <= width && mainPlatform.width >= blockSize * 3) {
-                        platformsOut.push(new Platform(
-                            mainPlatform.x + mainPlatform.width - blockSize, 
-                            m.y - blockSize, 
-                            blockSize, 
-                            blockSize, 
-                            color, 
-                            'photo'
-                        ));
-                    }
+                    // Wall blocks are added post-BFS by addWallBlocks() for smart placement
                 }
 
                 // Filter out platforms that are too close vertically (minimum 1 block spacing)
@@ -2181,6 +2158,75 @@
                 }
                 
                 return filtered;
+            }
+
+            // Smart wall block placement (post-BFS): only place wall blocks on
+            // platform edges that don't face a reachable neighbor. This keeps walls
+            // as solid climbing assists (ADR 0009) without blocking jump paths.
+            function addWallBlocks(allPlatforms, limits) {
+                const blockSize = getScaledBlockSize();
+                // Only consider non-wall traversable platforms for wall placement
+                const mainPlatforms = allPlatforms.filter(p => p.kind !== 'wall');
+                const newWalls = [];
+
+                for (const platform of mainPlatforms) {
+                    // Only add walls on platforms wide enough (>= 3 blocks)
+                    if (platform.width < blockSize * 3) continue;
+
+                    // Check if any reachable neighbor approaches from the left or right
+                    let hasLeftNeighbor = false;
+                    let hasRightNeighbor = false;
+
+                    for (const other of mainPlatforms) {
+                        if (other === platform) continue;
+                        // Check both directions: can we reach other FROM platform, or reach platform FROM other
+                        const reachable = canReachPlatform(platform, other, limits) || canReachPlatform(other, platform, limits);
+                        if (!reachable) continue;
+
+                        // Determine which side the neighbor is on relative to this platform
+                        const otherCenterX = other.x + other.width / 2;
+                        const platformCenterX = platform.x + platform.width / 2;
+
+                        if (otherCenterX < platformCenterX) {
+                            hasLeftNeighbor = true;
+                        }
+                        if (otherCenterX > platformCenterX) {
+                            hasRightNeighbor = true;
+                        }
+
+                        // Early exit if both sides have neighbors
+                        if (hasLeftNeighbor && hasRightNeighbor) break;
+                    }
+
+                    // Place wall block on left edge only if no neighbor approaches from the left
+                    if (!hasLeftNeighbor && platform.x >= blockSize) {
+                        newWalls.push(new Platform(
+                            platform.x,
+                            platform.y - blockSize,
+                            blockSize,
+                            blockSize,
+                            platform.color,
+                            'wall'
+                        ));
+                    }
+
+                    // Place wall block on right edge only if no neighbor approaches from the right
+                    if (!hasRightNeighbor && platform.x + platform.width + blockSize <= processWidth) {
+                        newWalls.push(new Platform(
+                            platform.x + platform.width - blockSize,
+                            platform.y - blockSize,
+                            blockSize,
+                            blockSize,
+                            platform.color,
+                            'wall'
+                        ));
+                    }
+                }
+
+                // Add all wall blocks to the platform array
+                for (const wall of newWalls) {
+                    allPlatforms.push(wall);
+                }
             }
 
             function addHelperPlatformsIfNeeded(startPlatform, goalPlatform, allPlatforms, limits) {
@@ -2553,6 +2599,11 @@
             const limits = getJumpLimits();
             addHelperPlatformsIfNeeded(startPlatform, goalPlatform, platforms, limits);
 
+            // Add wall blocks on platform edges that don't face a reachable neighbor.
+            // Walls are solid climbing assists (ADR 0009) placed only where they won't
+            // block jump paths — edges facing a reachable neighbor stay clear.
+            addWallBlocks(platforms, limits);
+
             // Scale all platforms from process coordinates to world coordinates
             const scaleX = worldWidth / processWidth;
             const scaleY = worldHeight / processHeight;
@@ -2751,11 +2802,21 @@
             camera.x += (camera.targetX - camera.x) * camera.smoothing;
             camera.y += (camera.targetY - camera.y) * camera.smoothing;
             
-            // Clamp camera to world bounds (not canvas bounds)
+            // Clamp camera to world bounds, centering when viewport exceeds world
             const viewportWidth = canvas.width / camera.zoom;
             const viewportHeight = canvas.height / camera.zoom;
-            camera.x = Math.max(0, Math.min(camera.x, worldWidth - viewportWidth));
-            camera.y = Math.max(0, Math.min(camera.y, worldHeight - viewportHeight));
+            if (viewportWidth >= worldWidth) {
+                // Viewport wider than world — center horizontally
+                camera.x = -(viewportWidth - worldWidth) / 2;
+            } else {
+                camera.x = Math.max(0, Math.min(camera.x, worldWidth - viewportWidth));
+            }
+            if (viewportHeight >= worldHeight) {
+                // Viewport taller than world — center vertically
+                camera.y = -(viewportHeight - worldHeight) / 2;
+            } else {
+                camera.y = Math.max(0, Math.min(camera.y, worldHeight - viewportHeight));
+            }
         }
 
         // Main game loop
@@ -2765,8 +2826,8 @@
             // Update camera position
             updateCamera();
 
-            // Clear canvas
-            ctx.fillStyle = '#87ceeb';
+            // Clear canvas with dark letterbox color (area outside the game world)
+            ctx.fillStyle = '#1a1a2e';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // Save context state
@@ -2775,6 +2836,10 @@
             // Apply camera transformation for game world
             ctx.scale(camera.zoom, camera.zoom);
             ctx.translate(-camera.x, -camera.y);
+
+            // Fill world bounds with sky-blue background
+            ctx.fillStyle = '#87ceeb';
+            ctx.fillRect(0, 0, worldWidth, worldHeight);
 
             // Draw the photo as background in world space (so it zooms with camera)
             if (backgroundImage) {
