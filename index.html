@@ -372,6 +372,25 @@
             align-self: center;
         }
 
+        /* Game logo styles */
+        .game-logo {
+            max-width: 200px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            margin-bottom: 16px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .game-logo-sm {
+            max-width: 80px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            vertical-align: middle;
+            margin-right: 12px;
+        }
+
         /* Intro screen styles */
         .intro-screen {
             text-align: center;
@@ -439,19 +458,34 @@
             position: fixed;
             inset: 0;
             z-index: 100;
-            background: #000;
+            background: #1a1a2e;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             padding: 0;
             margin: 0;
+            overflow: hidden;
+        }
+
+        /* Frosted-glass background behind the game canvas */
+        .game-canvas-container.fullscreen::before {
+            content: '';
+            position: absolute;
+            inset: -20px;
+            background: url('images/photo-jumper-sq.png') center / cover no-repeat;
+            filter: blur(20px) brightness(0.3);
+            z-index: 0;
         }
 
         .game-canvas-container.fullscreen #gameCanvas {
-            width: 100%;
-            height: 100%;
+            max-width: 100vw;
+            max-height: 100vh;
+            width: auto;
+            height: auto;
             border-radius: 0;
+            position: relative;
+            z-index: 1;
         }
 
         /* Hide non-essential elements when canvas is fullscreen */
@@ -601,7 +635,8 @@
     <div class="container">
         <!-- Intro Screen -->
         <div class="intro-screen" id="introScreen">
-            <h1>🎮 Photo Jumper</h1>
+            <img src="images/photo-jumper-sq.png" alt="Photo Jumper" class="game-logo">
+            <h1>Photo Jumper</h1>
             <p class="tagline">Turn your photos into playable platformer levels!</p>
             
             <div class="features">
@@ -624,7 +659,7 @@
 
         <!-- Game Screen -->
         <div class="game-screen" id="gameScreen">
-            <h1>🎮 Photo Jumper</h1>
+            <h1><img src="images/photo-jumper-sq.png" alt="Photo Jumper" class="game-logo-sm">Photo Jumper</h1>
             
             <div class="upload-section">
             <div class="button-group">
@@ -1267,10 +1302,6 @@
                     const glowIntensity = 0.7 + Math.sin(goal.animation * 2) * 0.3;
                     ctx.shadowColor = '#FFD700';
                     ctx.shadowBlur = 15 * glowIntensity;
-                } else {
-                    // Draw shadow for entire platform
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-                    ctx.fillRect(this.x + 2, this.y + 2, this.width, this.height);
                 }
                 
                 // Draw platforms as a series of connected square blocks
@@ -2776,18 +2807,18 @@
         
         // Calculate and update zoom limits based on world and canvas size
         function updateZoomLimits() {
-            // Calculate minimum zoom so entire world fits in viewport
+            // Calculate zoom levels: fit (entire world visible) and fill (no letterbox)
             const zoomToFitWidth = canvas.width / worldWidth;
             const zoomToFitHeight = canvas.height / worldHeight;
             const minZoomToFitWorld = Math.min(zoomToFitWidth, zoomToFitHeight);
+            const fillZoom = Math.max(zoomToFitWidth, zoomToFitHeight);
             
-            // Set minZoom to be slightly less than fit-to-world to ensure full visibility
+            // minZoom allows zooming out to see the full level
             camera.minZoom = Math.max(0.1, minZoomToFitWorld * 0.95);
-            camera.maxZoom = 2.0;  // Keep max zoom fixed
+            camera.maxZoom = 2.0;
             
-            // Auto-fit zoom: shows the world filling the viewport
-            // Uses the fit-to-world zoom, clamped between minZoom and maxZoom
-            camera.autoFitZoom = Math.max(camera.minZoom, Math.min(minZoomToFitWorld, camera.maxZoom));
+            // Default zoom fills the viewport (no letterbox) — camera pans to show content
+            camera.autoFitZoom = Math.max(camera.minZoom, Math.min(fillZoom, camera.maxZoom));
         }
 
         // Update camera to follow player
