@@ -602,6 +602,33 @@
             font-weight: bold;
         }
 
+        /* Detection mode indicator badge */
+        .detection-mode-badge {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 101;
+            background: rgba(0, 0, 0, 0.75);
+            color: #FFD700;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            display: none;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .detection-mode-badge.visible {
+            display: block;
+        }
+
+        .detection-mode-badge.ml-active {
+            background: rgba(102, 126, 234, 0.85);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
         /* Position game info overlay when fullscreen */
         .game-canvas-container.fullscreen ~ .game-info,
         .game-screen:has(.game-canvas-container.fullscreen) .game-info {
@@ -748,6 +775,9 @@
             <span class="word-progress" id="wordProgress"></span>
         </div>
 
+        <!-- Detection mode indicator badge -->
+        <div class="detection-mode-badge" id="detectionModeBadge">Grid Only</div>
+
         <div class="game-canvas-container">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <canvas id="previewCanvas" class="preview-canvas"></canvas>
@@ -780,9 +810,13 @@
             <p>6. Walk into the glowing <strong>golden portal</strong> to win!</p>
             <p>7. Press <strong>R</strong> to respawn, <strong>G</strong> to regenerate level</p>
             <p><label><input type="checkbox" id="debugOverlayToggle"> Debug overlay (shows platform grid)</label></p>
-            <p><label><input type="checkbox" id="mlDetectionToggle" aria-describedby="mlStatusDesc"> ML object detection (experimental)</label>
+            <p>
+                <label><input type="checkbox" id="mlDetectionToggle" aria-describedby="mlStatusDesc"> ML object detection (experimental)</label>
                 <span id="mlStatus" style="font-size: 12px; color: #666;"></span>
                 <span id="mlStatusDesc" class="visually-hidden" style="position: absolute; left: -10000px;">When enabled, uses machine learning to detect objects in your photo and create platforms from them. May increase loading time.</span>
+            </p>
+            <p style="font-size: 11px; color: #888; margin-top: 5px; margin-left: 20px;">
+                💡 <strong>Tip:</strong> Use <strong>Grid only</strong> for landscapes/buildings. Use <strong>ML detection</strong> for furniture, vehicles, and objects.
             </p>
             <p style="font-size: 12px; color: #666; margin-top: 15px;">
                 🔒 <strong>Privacy:</strong> All photos are processed entirely in your browser. No images are uploaded, stored, or transmitted to any server.
@@ -851,6 +885,7 @@
         const wordBar = document.getElementById('wordBar');
         const wordLetters = document.getElementById('wordLetters');
         const wordProgress = document.getElementById('wordProgress');
+        const detectionModeBadge = document.getElementById('detectionModeBadge');
 
         const feedbackModal = document.getElementById('feedbackModal');
         const feedbackForm = document.getElementById('feedbackForm');
@@ -1604,6 +1639,19 @@
             }
         }
 
+        // Update detection mode badge to show current detection method
+        function updateDetectionModeBadge() {
+            if (!detectionModeBadge) return;
+            
+            if (mlDetectionEnabled && onnxModelLoaded) {
+                detectionModeBadge.textContent = '🤖 Grid + ML';
+                detectionModeBadge.classList.add('ml-active');
+            } else {
+                detectionModeBadge.textContent = '📐 Grid Only';
+                detectionModeBadge.classList.remove('ml-active');
+            }
+        }
+
         // Preprocess image for YOLO model input
         function preprocessImageForYOLO(imageData, width, height) {
             // Create a temporary canvas to resize image to ML_INPUT_SIZE x ML_INPUT_SIZE
@@ -2117,6 +2165,9 @@
         // Process image and create platforms
         async function processImage(image) {
             console.log('processImage called with image:', image.width, 'x', image.height);
+            
+            // Update detection mode badge to show current mode
+            updateDetectionModeBadge();
             
             // Store the image for background rendering
             backgroundImage = image;
@@ -3136,6 +3187,9 @@
             uploadBtn.style.display = 'none';
             cameraBtn.style.display = 'none';
             
+            // Show detection mode badge
+            detectionModeBadge.classList.add('visible');
+            
             score = 0;
             wordCompleteBonus = 0;
             correctOrderBonus = 0;
@@ -3591,6 +3645,7 @@
             canvas.style.display = 'none';
             gameInfo.style.display = 'none';
             wordBar.style.display = 'none';  // Hide word bar
+            detectionModeBadge.classList.remove('visible');  // Hide detection mode badge
             resetBtn.style.display = 'none';
             uploadBtn.style.display = 'inline-block';
             cameraBtn.style.display = 'inline-block';
@@ -3696,12 +3751,17 @@
                     // Reset error state to allow retry
                     onnxLoadError = null;
                     
+                    // Show loading status
+                    updateMLStatus('Loading model...');
+                    
                     // Start loading the ONNX model when user enables ML detection
                     const success = await initONNXModel();
                     if (!success) {
                         // If loading fails, disable the toggle and show helpful message
                         mlDetectionToggle.checked = false;
                         mlDetectionEnabled = false;
+                        updateMLStatus('');
+                        updateDetectionModeBadge();
                         
                         // Show actual error from console
                         const errorMsg = onnxLoadError?.message || 'Unknown error';
@@ -3713,11 +3773,16 @@
                             '- Check internet connection (CDN needed)\n' +
                             '- Clear browser cache\n\n' +
                             'See docs/ONNX_SETUP.md for full troubleshooting.');
+                    } else {
+                        updateMLStatus('ML ready');
+                        updateDetectionModeBadge();
                     }
                 } else if (mlDetectionEnabled && onnxModelLoaded) {
                     updateMLStatus('ML ready');
+                    updateDetectionModeBadge();
                 } else {
                     updateMLStatus('');
+                    updateDetectionModeBadge();
                 }
             });
         }
