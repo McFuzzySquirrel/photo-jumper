@@ -273,7 +273,7 @@
         .mobile-controls {
             display: none;
             justify-content: center;
-            gap: 25px;  /* Increased from 15px for better spacing */
+            gap: 12px;  /* Reduced from 25px since buttons are smaller */
             margin-top: 15px;
             user-select: none;
         }
@@ -283,16 +283,16 @@
         }
 
         .control-btn {
-            width: 55px;  /* Reduced from 70px */
-            height: 55px;  /* Reduced from 70px */
+            width: 27.5px;  /* 50% smaller than 55px */
+            height: 27.5px;  /* 50% smaller than 55px */
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: 3px solid white;
-            border-radius: 15px;
+            border: 2px solid white;  /* Reduced border for smaller size */
+            border-radius: 8px;  /* Reduced border radius */
             color: white;
-            font-size: 20px;  /* Reduced from 24px */
+            font-size: 10px;  /* 50% smaller than 20px */
             font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);  /* Reduced shadow */
             touch-action: none;
             transition: transform 0.1s, box-shadow 0.1s, opacity 0.1s;
             opacity: 0.5;
@@ -300,12 +300,12 @@
 
         .control-btn:active {
             transform: scale(0.95);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);  /* Reduced shadow */
             opacity: 1.0;
         }
 
         .control-btn.jump-btn {
-            width: 70px;  /* Reduced from 90px */
+            width: 35px;  /* 50% smaller than 70px */
             background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
         }
 
@@ -316,7 +316,7 @@
             bottom: 90px;  /* Above mobile controls */
             right: 20px;
             flex-direction: row;  /* Horizontal layout */
-            gap: 10px;
+            gap: 5px;  /* Reduced from 10px since buttons are smaller */
             z-index: 102;
         }
 
@@ -325,12 +325,12 @@
         }
 
         .zoom-btn {
-            width: 50px;
-            height: 50px;
-            font-size: 24px;
+            width: 25px;  /* 50% smaller than 50px */
+            height: 25px;  /* 50% smaller than 50px */
+            font-size: 12px;  /* 50% smaller than 24px */
             background: rgba(0, 0, 0, 0.7);
-            border: 2px solid rgba(255, 255, 255, 0.5);
-            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.5);  /* Reduced border */
+            border-radius: 4px;  /* Reduced border radius */
             cursor: pointer;
             transition: all 0.2s;
             color: white;
@@ -356,7 +356,7 @@
         .zoom-btn.zoom-btn-action {
             background: rgba(102, 126, 234, 0.9);
             border-color: rgba(255, 255, 255, 0.9);
-            font-size: 16px;
+            font-size: 8px;  /* 50% smaller than 16px */
         }
 
         .zoom-btn.zoom-btn-action:hover {
@@ -365,10 +365,10 @@
         }
 
         /* Visual separator between game action buttons and zoom buttons */
-        /* Note: Vertical bar (1px wide × 30px tall) for horizontal button layout */
+        /* Note: Vertical bar (1px wide × 15px tall) for horizontal button layout */
         .zoom-btn-separator {
             width: 1px;
-            height: 30px;
+            height: 15px;  /* Reduced from 30px to match smaller buttons */
             background: rgba(255, 255, 255, 0.3);
             align-self: center;
         }
