@@ -365,6 +365,7 @@
         }
 
         /* Visual separator between game action buttons and zoom buttons */
+        /* Note: Vertical bar (1px wide × 30px tall) for horizontal button layout */
         .zoom-btn-separator {
             width: 1px;
             height: 30px;
@@ -3164,7 +3165,9 @@
             const isFullscreen = container.classList.contains('fullscreen');
             
             if (isFullscreen) {
-                // Fill entire screen on mobile/fullscreen
+                // Fill entire screen on mobile/fullscreen for maximum gameplay area
+                // Note: This intentionally ignores photo aspect ratio to maximize screen usage
+                // The game world will scale to fill available space (may appear stretched)
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight;
             } else {
