@@ -10,9 +10,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Photo Jumper">
     
-    <!-- Lock screen orientation to landscape when in fullscreen on mobile -->
-    <link rel="manifest" href="manifest.json">
-    
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
     <!-- Icons -->
@@ -3561,7 +3558,9 @@
             // Lock to landscape orientation on mobile devices
             if (screen.orientation && screen.orientation.lock) {
                 screen.orientation.lock('landscape').catch(err => {
-                    console.log('Screen orientation lock not supported or failed:', err);
+                    // Orientation lock requires fullscreen API and may not be supported on all devices
+                    // This is an optional enhancement - game works fine without it
+                    console.log('Screen orientation lock not available:', err.name, err.message);
                 });
             }
         }
