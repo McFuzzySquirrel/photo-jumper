@@ -55,33 +55,31 @@ Copilot should prioritize:
 
 Detected image geometry must be treated as **input hints**, not ground truth.
 
-### Grid-Based Detection (Primary — always available)
+### ML-Primary Detection (Required)
 
-Grid-based brightness/edge sampling (see ADR 0003):
+ONNX Runtime Web with YOLOE-26n-seg model:
 
-- Grid cells are sampled at `GRID_SIZE` (20px) intervals
-- Brightness and edge-detection thresholds filter candidate cells
-- Cells are merged into block-aligned platforms
-- Short, noisy, or low-confidence regions are discarded
-
-### ONNX ML Object Detection (Optional — opt-in)
-
-ONNX Runtime Web with YOLOv8n model (see ADRs 0005, 0007):
-
-- **Opt-in** toggle in the game UI; disabled by default on low-power devices
-- Lazy-loaded from CDN (`onnxruntime-web@1.17.0`) — does not penalize initial page load
+- **ML is primary** and required for platform generation
+- Model is lazy-loaded with a dedicated loading UI
 - Uses WASM backend for broad compatibility
-- Detects objects from COCO dataset classes; filters by `PLATFORMABLE_CLASSES`
-- Bottom-edge heuristic maps bounding boxes to platform surfaces
-- Falls back to grid-based detection on any error, timeout, or user toggle-off
-- ML-detected platforms are merged with grid-based platforms; duplicates are filtered
-- All ML-generated platforms pass through the same gameplay constraints as grid platforms
+- Open-vocabulary class list is curated for platformable surfaces
+- Segmentation masks determine platform top contours
+- Contours are converted to **stepped block platforms** aligned to the 20px grid
+
+### Fallback Chain for ML-Sparse Photos
+
+When ML detection yields too few platforms, use a confidence-based fallback chain:
+
+1. **Hough horizontal lines** (fast line detection)
+2. **Edge-density heat map** (smarter grid-like surface hints)
+3. **Feature-guided procedural skeleton path** (guarantees playability)
+
+All fallback platforms must still pass the same gameplay constraints and reachability validation.
 
 Copilot must ensure:
 
 - Platform generation respects gameplay constraints even if it alters photo fidelity
-- ML detection remains optional and never required for playable levels
-- Any new detection method must fall back gracefully to grid-based detection
+- Fallback chain guarantees a playable path for ML-sparse photos
 - All platforms (regardless of source) pass reachability validation
 
 ---
@@ -247,8 +245,8 @@ Copilot must:
 - Keep physics lightweight and deterministic
 - Expose tunable values instead of hardcoding numbers
 - Prefer clarity and readability over cleverness
-- ONNX Runtime Web is lazy-loaded from CDN; never block page load on ML model
-- Maintain single-file `index.html` philosophy (CDN imports are acceptable)
+- ONNX Runtime Web is lazy-loaded from CDN with a dedicated loading UI
+- Prefer a multi-file ES module structure (no build step unless explicitly requested)
 - All physics scale proportionally to world size via `BASE_WORLD_WIDTH` ratio
 
 ---
@@ -293,7 +291,7 @@ These are the **actual values** used in the game. Copilot must reference these w
 - `BRIGHTNESS_THRESHOLD = 140` — minimum brightness for grid-based platform detection
 - `EDGE_DETECTION_THRESHOLD = 30` — edge gradient threshold
 - `ML_CONFIDENCE_THRESHOLD = 0.3` — ONNX detection confidence filter
-- `ML_INPUT_SIZE = 640` — YOLOv8n input dimensions
+- `ML_INPUT_SIZE = 640` — YOLOE-26n-seg input dimensions
 - `ML_INFERENCE_TIMEOUT_MS = 5000` — maximum ML inference time before fallback
 
 ### Level Safety Guardrails
@@ -310,7 +308,7 @@ These are the **actual values** used in the game. Copilot must reference these w
 
 ### Performance Targets
 - Target frame rate: **60 fps**
-- Max ML inference time: **5000ms** (falls back to grid-based on timeout)
+- Max ML inference time: **5000ms** (falls back via the ML-sparse chain on timeout)
 - Max platform count: **50**
 
 ---

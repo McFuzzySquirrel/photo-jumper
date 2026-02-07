@@ -8,6 +8,22 @@ const OFFLINE_CACHE_NAME = 'photo-jumper-offline-v2';
 const CORE_ASSETS = [
   '/',
   '/index.html',
+  '/js/main.js',
+  '/js/config.js',
+  '/js/runtime.js',
+  '/js/detection/ml.js',
+  '/js/detection/grid.js',
+  '/js/detection/pipeline.js',
+  '/js/detection/fallback.js',
+  '/js/detection/hough.js',
+  '/js/detection/edge-density.js',
+  '/js/detection/skeleton.js',
+  '/js/detection/helpers.js',
+  '/js/detection/contours.js',
+  '/js/engine/goal.js',
+  '/js/engine/platform.js',
+  '/js/engine/letter.js',
+  '/js/engine/player.js',
   '/manifest.json',
 ];
 

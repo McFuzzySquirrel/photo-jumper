@@ -105,6 +105,13 @@ ML detection is most useful for photos containing:
 
 ## Technical Details
 
+### Segmentation (Planned)
+
+YOLOE-26n-seg is the target ML model. It will provide segmentation masks that
+convert into stepped, block-aligned platforms. This is not wired to runtime yet,
+but the pipeline is scaffolded and will replace the bounding-box-only approach
+once the model outputs are confirmed.
+
 ### Why These Specific Objects?
 
 These objects typically have **detectable boundaries** that can serve as platform surfaces:
