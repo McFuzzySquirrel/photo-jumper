@@ -891,10 +891,10 @@
         const JUMP_CUT_DAMPING = 0.5;  // Multiplier for velocity on early jump release (0-1, lower = shorter hop)
 
         const GRID_SIZE = 20;  // Reduced from 30 to detect more platforms (1x player size)
-        const BRIGHTNESS_THRESHOLD = 140;  // Increased from 128 to require brighter areas for platforms
+        const BRIGHTNESS_THRESHOLD = 50;  // Lowered to only detect very dark objects (not shadows)
         const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-        const EDGE_DETECTION_THRESHOLD = 30;  // Reduced from 40 for better edge detection
-        const EDGE_BRIGHTNESS_THRESHOLD = 200;  // Increased from 180 to accept more edge-detected platforms
+        const EDGE_DETECTION_THRESHOLD = 70;  // Increased to reduce sensitivity to shadow edges
+        const EDGE_BRIGHTNESS_THRESHOLD = 80;  // Lowered to be very selective about edge-based platforms
 
         // Modular block platform system
         const BLOCK_SIZE = 20;  // Individual block size (matches GRID_SIZE and PLAYER_SIZE)
