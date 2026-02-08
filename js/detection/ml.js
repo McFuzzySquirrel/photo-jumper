@@ -1,4 +1,5 @@
 export const ML_DETECTION_ENABLED_DEFAULT = false;
+export const ML_ONLY_MODE_DEFAULT = false;
 export const ML_CONFIDENCE_THRESHOLD = 0.3;
 export const ML_INPUT_SIZE = 640;
 export const ML_INFERENCE_TIMEOUT_MS = 5000;
@@ -6,6 +7,7 @@ export const ML_MIN_DETECTION_SIZE = 10;
 export const ML_MIN_PLATFORM_COUNT = 2;
 export const ML_PLATFORM_MERGE_TOLERANCE = 20;
 export const ML_PLATFORM_OVERLAP_TOLERANCE_Y = 30;
+export const ML_ONLY_HELPER_MAX_WIDTH_BLOCKS = 2;
 
 // YOLOE-26n-seg is the target model (ADR guidance). Keep unset until assets are ready.
 // When available, swap ML_MODEL_URLS to YOLOE and update output parsing for segmentation masks.
