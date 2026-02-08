@@ -1,12 +1,19 @@
 export function combinePlatforms(options) {
     const {
         mlDetectionEnabled,
+        mlOnlyMode,
         mlPlatforms,
         gridBasedPlatforms,
         overlapToleranceY
     } = options;
 
     if (mlDetectionEnabled && mlPlatforms.length > 0) {
+        // If ML-only mode is enabled, return only ML platforms (no grid platforms)
+        if (mlOnlyMode) {
+            return [...mlPlatforms];
+        }
+
+        // Otherwise, merge ML and grid platforms (existing behavior)
         const combined = [...mlPlatforms];
 
         for (const gridPlatform of gridBasedPlatforms) {

@@ -48,6 +48,7 @@ import { Letter } from './engine/letter.js';
 import { Player, applyJumpCut } from './engine/player.js';
 import {
     ML_DETECTION_ENABLED_DEFAULT,
+    ML_ONLY_MODE_DEFAULT,
     ML_MIN_PLATFORM_COUNT,
     ML_PLATFORM_OVERLAP_TOLERANCE_Y,
     initONNXModel,
@@ -171,6 +172,7 @@ let debugSegmentationPlatforms = [];
 
 // ONNX state
 let mlDetectionEnabled = ML_DETECTION_ENABLED_DEFAULT;
+let mlOnlyMode = ML_ONLY_MODE_DEFAULT;
 let debugDetectedObjects = [];
 
 // Calculate scaled block size - all visual elements scale with world dimensions
@@ -237,8 +239,13 @@ function updateDetectionModeBadge() {
     if (!detectionModeBadge) return;
 
     if (mlDetectionEnabled && isModelLoaded()) {
-        detectionModeBadge.textContent = '🤖 Grid + ML';
-        detectionModeBadge.classList.add('ml-active');
+        if (mlOnlyMode) {
+            detectionModeBadge.textContent = '🤖 ML Only';
+            detectionModeBadge.classList.add('ml-active');
+        } else {
+            detectionModeBadge.textContent = '🤖 Grid + ML';
+            detectionModeBadge.classList.add('ml-active');
+        }
     } else {
         detectionModeBadge.textContent = '📐 Grid Only';
         detectionModeBadge.classList.remove('ml-active');
@@ -592,7 +599,8 @@ async function processImage(image) {
             overlapsAny,
             isReachable,
             canReachPlatform,
-            debugHelperPlatforms
+            debugHelperPlatforms,
+            mlOnlyMode
         });
 
         if (!isReachable(startPlatform, goalPlatform, allPlatforms, limits)) {
@@ -794,6 +802,7 @@ async function processImage(image) {
 
     platforms = combinePlatforms({
         mlDetectionEnabled,
+        mlOnlyMode,
         mlPlatforms: effectiveMlPlatforms,
         gridBasedPlatforms,
         overlapToleranceY: ML_PLATFORM_OVERLAP_TOLERANCE_Y
@@ -1831,10 +1840,20 @@ if (debugOverlayToggle) {
 
 // ML Detection toggle handling
 const mlDetectionToggle = document.getElementById('mlDetectionToggle');
+const mlOnlyModeToggle = document.getElementById('mlOnlyModeToggle');
 if (mlDetectionToggle) {
     mlDetectionToggle.checked = ML_DETECTION_ENABLED_DEFAULT;
     mlDetectionToggle.addEventListener('change', async () => {
         mlDetectionEnabled = Boolean(mlDetectionToggle.checked);
+        
+        // Enable/disable ML-only mode toggle based on ML detection state
+        if (mlOnlyModeToggle) {
+            mlOnlyModeToggle.disabled = !mlDetectionEnabled;
+            if (!mlDetectionEnabled) {
+                mlOnlyModeToggle.checked = false;
+                mlOnlyMode = false;
+            }
+        }
         
         if (mlDetectionEnabled && !isModelLoaded() && !isModelLoading()) {
             // Reset error state to allow retry
@@ -1851,6 +1870,13 @@ if (mlDetectionToggle) {
                 mlDetectionEnabled = false;
                 updateMLStatus('');
                 updateDetectionModeBadge();
+                
+                // Also disable ML-only mode toggle
+                if (mlOnlyModeToggle) {
+                    mlOnlyModeToggle.disabled = true;
+                    mlOnlyModeToggle.checked = false;
+                    mlOnlyMode = false;
+                }
                 
                 // Show actual error from console
                 const errorMsg = getOnnxLoadError()?.message || 'Unknown error';
@@ -1873,6 +1899,17 @@ if (mlDetectionToggle) {
             updateMLStatus('');
             updateDetectionModeBadge();
         }
+    });
+}
+
+// ML-only mode toggle handling
+if (mlOnlyModeToggle) {
+    mlOnlyModeToggle.checked = ML_ONLY_MODE_DEFAULT;
+    mlOnlyModeToggle.disabled = !mlDetectionEnabled; // Initially disabled unless ML is enabled
+    mlOnlyModeToggle.addEventListener('change', () => {
+        mlOnlyMode = Boolean(mlOnlyModeToggle.checked);
+        console.log(`ML-only mode ${mlOnlyMode ? 'enabled' : 'disabled'}`);
+        updateDetectionModeBadge();
     });
 }
 

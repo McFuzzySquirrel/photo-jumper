@@ -13,7 +13,8 @@ export function addHelperPlatformsIfNeeded(options) {
         overlapsAny,
         isReachable,
         canReachPlatform,
-        debugHelperPlatforms
+        debugHelperPlatforms,
+        mlOnlyMode
     } = options;
 
     if (isReachable(startPlatform, goalPlatform, allPlatforms, limits)) {
@@ -21,6 +22,10 @@ export function addHelperPlatformsIfNeeded(options) {
     }
 
     const helperColor = 'rgba(80, 120, 255, 0.9)';
+    
+    // Cap helper platform width to 2 blocks in ML-only mode
+    const maxHelperWidthBlocks = mlOnlyMode ? 2 : 12;
+    const maxHelperWidth = blockSize * maxHelperWidthBlocks;
 
     let current = startPlatform;
     let added = 0;
@@ -52,9 +57,10 @@ export function addHelperPlatformsIfNeeded(options) {
     function midpointHelper(from, to) {
         const fromCenter = from.x + from.width / 2;
         const toCenter = to.x + to.width / 2;
-        const midX = (fromCenter + toCenter) / 2 - blockSize;
+        const helperWidth = Math.min(blockSize * 2, maxHelperWidth);
+        const midX = (fromCenter + toCenter) / 2 - helperWidth / 2;
         const midY = (from.y + to.y) / 2;
-        return [new platformClass(midX, midY, blockSize * 2, blockSize, helperColor, 'helper')];
+        return [new platformClass(midX, midY, helperWidth, blockSize, helperColor, 'helper')];
     }
 
     function staircaseHelpers(from, to) {
@@ -62,17 +68,18 @@ export function addHelperPlatformsIfNeeded(options) {
         const toCenter = to.x + to.width / 2;
         const steps = 3;
         const helpers = [];
+        const helperWidth = Math.min(blockSize * 2, maxHelperWidth);
         for (let i = 1; i <= steps; i++) {
             const t = i / (steps + 1);
-            const x = fromCenter + (toCenter - fromCenter) * t - blockSize;
+            const x = fromCenter + (toCenter - fromCenter) * t - helperWidth / 2;
             const y = from.y + (to.y - from.y) * t;
-            helpers.push(new platformClass(x, y, blockSize * 2, blockSize, helperColor, 'helper'));
+            helpers.push(new platformClass(x, y, helperWidth, blockSize, helperColor, 'helper'));
         }
         return helpers;
     }
 
     function landingShelfHelper(from, to) {
-        const shelfWidth = blockSize * 3;
+        const shelfWidth = Math.min(blockSize * 3, maxHelperWidth);
         const x = to.x + (from.x < to.x ? -shelfWidth : to.width);
         const y = to.y;
         return [new platformClass(x, y, shelfWidth, blockSize, helperColor, 'helper')];
@@ -83,11 +90,12 @@ export function addHelperPlatformsIfNeeded(options) {
         const toLeft = to.x;
         const gap = Math.max(0, toLeft - fromRight);
         if (gap <= blockSize) return [];
-        const count = Math.min(5, Math.ceil(gap / (blockSize * 2)));
+        const helperWidth = Math.min(blockSize * 2, maxHelperWidth);
+        const count = Math.min(5, Math.ceil(gap / helperWidth));
         const helpers = [];
         for (let i = 1; i <= count; i++) {
-            const x = fromRight + i * (gap / (count + 1)) - blockSize;
-            helpers.push(new platformClass(x, from.y, blockSize * 2, blockSize, helperColor, 'helper'));
+            const x = fromRight + i * (gap / (count + 1)) - helperWidth / 2;
+            helpers.push(new platformClass(x, from.y, helperWidth, blockSize, helperColor, 'helper'));
         }
         return helpers;
     }
@@ -95,7 +103,8 @@ export function addHelperPlatformsIfNeeded(options) {
     function directConnector(from, to) {
         const left = Math.min(from.x, to.x);
         const right = Math.max(from.x + from.width, to.x + to.width);
-        return [new platformClass(left, Math.min(from.y, to.y), right - left, blockSize, helperColor, 'helper')];
+        const connectorWidth = Math.min(right - left, maxHelperWidth);
+        return [new platformClass(left, Math.min(from.y, to.y), connectorWidth, blockSize, helperColor, 'helper')];
     }
 
     const strategies = [
