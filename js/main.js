@@ -27,8 +27,6 @@ import {
     GOAL_AREA_WIDTH,
     GOAL_AREA_HEIGHT,
     WORD_BAR_AREA_HEIGHT,
-    STUCK_CHECK_INTERVAL,
-    STUCK_MOVEMENT_THRESHOLD,
     COLLECTIBLE_LETTER_SIZE,
     COLLECTIBLE_LETTER_POINTS,
     COLLECTIBLE_LETTER_OFFSET_RATIO,
@@ -823,9 +821,6 @@ async function processImage(image) {
 
     // Randomly select a goal location from suitable platforms
     // Goal should be: reachable, sufficiently far from start, preferably high up
-    let goalSupportPlatform = null;
-    let goalX, goalY;
-    
     // Get candidate platforms for goal placement (photo/ml platforms in upper half)
     const candidateGoalPlatforms = platforms.filter(p => {
         if (p.kind !== 'photo' && p.kind !== 'ml') return false;
@@ -869,9 +864,9 @@ async function processImage(image) {
         );
     } else {
         // Fallback to safe position if no suitable platforms found
-        const goalX = width - (blockSize * 4);  // Ensure it's not too close to edge
-        const goalY = WORD_BAR_AREA_HEIGHT + (blockSize * 2) + 20;  // Low enough for portal to be above
-        goalPlatform = new Platform(goalX, goalY, blockSize * 3, blockSize, 'rgba(255, 200, 0, 0.9)', 'goal');
+        const fallbackGoalX = width - (blockSize * 4);  // Ensure it's not too close to edge
+        const fallbackGoalY = WORD_BAR_AREA_HEIGHT + (blockSize * 2) + 20;  // Low enough for portal to be above
+        goalPlatform = new Platform(fallbackGoalX, fallbackGoalY, blockSize * 3, blockSize, 'rgba(255, 200, 0, 0.9)', 'goal');
     }
     
     platforms.push(goalPlatform);
@@ -897,7 +892,7 @@ async function processImage(image) {
     });
 
     // Initialize player ON the start platform (not above it)
-    playerSpawnY = startPlatformY - 20; // Player height is 20, so spawn on top of platform
+    playerSpawnY = startPlatformY - processBlockSize; // Player spawns on top of platform
     player = new Player(
         PLAYER_SPAWN_X,
         playerSpawnY,
@@ -1111,6 +1106,12 @@ async function processImage(image) {
         }
     }
 
+    // Update player spawn position to world coordinates (platforms were just scaled)
+    playerSpawnY = startPlatform.y - getScaledPlayerSize();
+    if (player) {
+        player.y = playerSpawnY;
+    }
+
     // Place collectible letters on platforms (pass limits and startPlatform for reachability check)
     placeLettersOnPlatforms(startPlatform, limits);
 
@@ -1126,7 +1127,7 @@ async function processImage(image) {
             Math.abs((letter.y + letter.height) - p.y) < getScaledBlockSize() * 2
         );
         if (letterPlatform && !isReachable(startPlatform, letterPlatform, platforms, limits)) {
-            console.log(`Adding helpers for letter '${letter.letter}' platform at y=${Math.round(letterPlatform.y)}`);
+            console.log(`Adding helpers for letter '${letter.char}' platform at y=${Math.round(letterPlatform.y)}`);
             addHelperPlatformsIfNeeded(startPlatform, letterPlatform, platforms, limits);
         }
     }
@@ -2078,8 +2079,13 @@ updateLanHint();
 
 // Keyboard controls
 document.addEventListener('keydown', (e) => {
-    // ESC key returns to intro screen
+    // ESC key: close feedback modal first, then return to intro
     if (e.key === 'Escape') {
+        if (feedbackModal.classList.contains('open')) {
+            closeFeedbackModal();
+            e.preventDefault();
+            return;
+        }
         if (gameScreen.classList.contains('active')) {
             returnToIntro();
             e.preventDefault();
@@ -2313,12 +2319,6 @@ zoomOutBtn.addEventListener('touchstart', (e) => {
 zoomResetBtn.addEventListener('touchstart', (e) => {
     e.preventDefault();
     camera.zoom = camera.autoFitZoom;
-});
-
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && feedbackModal.classList.contains('open')) {
-        closeFeedbackModal();
-    }
 });
 
 // Register Service Worker for PWA/offline support
