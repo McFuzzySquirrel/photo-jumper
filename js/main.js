@@ -67,6 +67,18 @@ import { detectEdgeDensityPlatforms } from './detection/edge-density.js';
 import { generateSkeletonPlatforms } from './detection/skeleton.js';
 import { addHelperPlatformsIfNeeded as addHelperPlatformsIfNeededModule } from './detection/helpers.js';
 import { masksToTopContours, contoursToSteppedPlatforms } from './detection/contours.js';
+import {
+    isNative,
+    hapticLight,
+    hapticMedium,
+    hapticSuccess,
+    hideStatusBar,
+    lockLandscape,
+    onBackButton,
+    onAppStateChange,
+    takePhoto,
+    choosePhoto
+} from './platform/native-bridge.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -97,6 +109,35 @@ const wordBar = document.getElementById('wordBar');
 const wordLetters = document.getElementById('wordLetters');
 const wordProgress = document.getElementById('wordProgress');
 const detectionModeBadge = document.getElementById('detectionModeBadge');
+
+// Native app detection — apply class for CSS overrides
+const nativeApp = isNative();
+if (nativeApp) {
+    document.body.classList.add('native-app');
+}
+
+// Pause/Victory overlay elements
+const pauseBtn = document.getElementById('pauseBtn');
+const pauseOverlay = document.getElementById('pauseOverlay');
+const resumeBtn = document.getElementById('resumeBtn');
+const restartLevelBtn = document.getElementById('restartLevelBtn');
+const newPhotoBtn = document.getElementById('newPhotoBtn');
+const mainMenuBtn = document.getElementById('mainMenuBtn');
+const victoryOverlay = document.getElementById('victoryOverlay');
+const victoryScore = document.getElementById('victoryScore');
+const victoryTime = document.getElementById('victoryTime');
+const victoryWord = document.getElementById('victoryWord');
+const playAgainBtn = document.getElementById('playAgainBtn');
+const victoryNewPhotoBtn = document.getElementById('victoryNewPhotoBtn');
+const victoryMainMenuBtn = document.getElementById('victoryMainMenuBtn');
+
+// ML loading overlay elements
+const mlLoadingOverlay = document.getElementById('mlLoadingOverlay');
+const mlLoadingBar = document.getElementById('mlLoadingBar');
+const mlLoadingTip = document.getElementById('mlLoadingTip');
+
+// Mobile respawn button (in thumb-zone layout)
+const respawnBtnMobile = document.getElementById('respawnBtnMobile');
 
 const feedbackModal = document.getElementById('feedbackModal');
 const feedbackForm = document.getElementById('feedbackForm');
@@ -135,6 +176,7 @@ const SHORTEST_WORD = WORD_DICTIONARY.length > 0
     : 'FUN';  // Fallback if dictionary is somehow empty
 
 let gameRunning = false;
+let gamePaused = false;
 let platforms = [];
 let shadowPlatforms = [];
 let player = null;
@@ -453,6 +495,16 @@ function overlapsAny(candidate, allPlatforms) {
     return false;
 }
 
+// Load image from a data URL (used by native camera bridge)
+function loadImageFromDataUrl(dataUrl) {
+    const img = new Image();
+    img.onload = () => processImage(img);
+    img.onerror = () => {
+        console.error('Failed to load image from data URL');
+    };
+    img.src = dataUrl;
+}
+
 // Process image and create platforms
 async function processImage(image) {
     console.log('processImage called with image:', image.width, 'x', image.height);
@@ -644,6 +696,7 @@ async function processImage(image) {
     let usedSegmentationPlatforms = false;
     if (mlDetectionEnabled && isModelLoaded()) {
         console.log('🤖 Running ML object detection...');
+        if (nativeApp) showMlLoading(30, ML_TIPS[Math.floor(Math.random() * ML_TIPS.length)]);
         try {
             updateMLStatus('Detecting objects...');
             let onnxOutputs = null;
@@ -744,6 +797,9 @@ async function processImage(image) {
             console.warn('ML detection failed during inference:', err);
             updateMLStatus('Detection failed');
         }
+    }
+    if (nativeApp) {
+        showMlLoading(80, 'Building platforms...');
     }
 
     const { mlSparse, effectiveMlPlatforms } = evaluateMlPlatforms({
@@ -1133,6 +1189,7 @@ async function processImage(image) {
     }
 
     // Start game
+    hideMlLoading();
     startGame();
 }
 
@@ -1341,6 +1398,10 @@ function updateCamera() {
 // Main game loop
 function gameLoop() {
     if (!gameRunning) return;
+    if (gamePaused) {
+        requestAnimationFrame(gameLoop);
+        return;
+    }
 
     // Update camera position
     updateCamera();
@@ -1403,6 +1464,7 @@ function gameLoop() {
             if (letter.checkCollision(player)) {
                 letter.collected = true;
                 collectedLetters.push(letter);
+                hapticMedium();  // Haptic feedback on letter collection
                 
                 // Add points for the letter
                 score += COLLECTIBLE_LETTER_POINTS;
@@ -1441,6 +1503,7 @@ function gameLoop() {
                     scoreElement.textContent = score;
                 }
                 gameWon = true;
+                hapticSuccess();  // Haptic feedback on goal reached
                 console.log('Game won set to true');
             }
         } else {
@@ -1463,6 +1526,10 @@ function gameLoop() {
     // Draw win message if game is won
     if (gameWon) {
         drawWinMessage();
+        // Show victory overlay in native app mode (only once)
+        if (nativeApp && victoryOverlay && !victoryOverlay.classList.contains('visible')) {
+            showVictoryScreen();
+        }
     }
     
     // Draw zoom level indicator
@@ -1678,6 +1745,76 @@ function drawWinMessage() {
     ctx.fillText('Press ESC or click "Exit Game" to return to start', canvas.width / 2, canvas.height / 2 + yOffset + 30);
 }
 
+// ── Pause / Resume ────────────────────────────────────────────────
+
+function pauseGame() {
+    if (!gameRunning || gameWon) return;
+    gamePaused = true;
+    if (pauseOverlay) pauseOverlay.classList.add('visible');
+}
+
+function resumeGame() {
+    gamePaused = false;
+    if (pauseOverlay) pauseOverlay.classList.remove('visible');
+}
+
+// ── Victory Screen ────────────────────────────────────────────────
+
+function showVictoryScreen() {
+    if (!victoryOverlay) return;
+    const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+    if (victoryScore) victoryScore.textContent = score;
+    if (victoryTime) victoryTime.textContent = elapsedTime;
+    if (victoryWord) {
+        if (collectedLetters.length === targetWord.length) {
+            victoryWord.textContent = targetWord + ' ✓';
+        } else {
+            victoryWord.textContent = `${collectedLetters.length}/${targetWord.length} letters`;
+        }
+    }
+    victoryOverlay.classList.add('visible');
+}
+
+function hideVictoryScreen() {
+    if (victoryOverlay) victoryOverlay.classList.remove('visible');
+}
+
+// ── ML Loading Overlay ────────────────────────────────────────────
+
+const ML_TIPS = [
+    'Your photo is being analyzed by AI to find platformable objects',
+    'Furniture, vehicles, and animals make great platforms!',
+    'Collect golden letters to spell words for bonus points',
+    'Hold the jump button for a higher jump',
+    'Reach the golden portal to complete the level',
+];
+
+function showMlLoading(progress, statusText) {
+    if (!mlLoadingOverlay) return;
+    mlLoadingOverlay.classList.add('visible');
+    if (mlLoadingBar) mlLoadingBar.style.width = `${Math.min(100, progress)}%`;
+    if (mlLoadingTip && statusText) mlLoadingTip.textContent = statusText;
+}
+
+function hideMlLoading() {
+    if (mlLoadingOverlay) mlLoadingOverlay.classList.remove('visible');
+}
+
+// ── Return to main menu (native or web) ──────────────────────────
+
+function returnToMainMenu() {
+    hideVictoryScreen();
+    resumeGame();
+    resetGame();
+    if (nativeApp) {
+        // In native mode, show splash (main menu)
+        splashScreen.classList.remove('hidden');
+        gameScreen.classList.remove('active');
+    } else {
+        showIntroScreen();
+    }
+}
+
 // Show intro screen (from splash or back from game)
 function showIntroScreen() {
     splashScreen.classList.add('hidden');
@@ -1730,6 +1867,7 @@ function returnToIntro() {
 // Reset game
 function resetGame() {
     gameRunning = false;
+    gamePaused = false;
     gameWon = false;
     platforms = [];
     player = null;
@@ -1745,6 +1883,8 @@ function resetGame() {
     gameInfo.style.display = 'none';
     wordBar.style.display = 'none';  // Hide word bar
     detectionModeBadge.classList.remove('visible');  // Hide detection mode badge
+    hideVictoryScreen();
+    resumeGame();
     resetBtn.style.display = 'none';
     uploadBtn.style.display = 'inline-block';
     cameraBtn.style.display = 'inline-block';
@@ -1943,12 +2083,33 @@ async function copyLanLink() {
 }
 
 // Event listeners
-splashPlayBtn.addEventListener('click', showIntroScreen);
+splashPlayBtn.addEventListener('click', () => {
+    if (nativeApp) {
+        // Native mode: skip intro, go directly to game screen
+        showGameScreen();
+    } else {
+        showIntroScreen();
+    }
+});
 startGameBtn.addEventListener('click', showGameScreen);
 exitFullscreenBtn.addEventListener('click', returnToIntro);
 
-uploadBtn.addEventListener('click', () => fileInput.click());
-cameraBtn.addEventListener('click', () => cameraInput.click());
+uploadBtn.addEventListener('click', async () => {
+    if (nativeApp) {
+        const dataUrl = await choosePhoto();
+        if (dataUrl) loadImageFromDataUrl(dataUrl);
+    } else {
+        fileInput.click();
+    }
+});
+cameraBtn.addEventListener('click', async () => {
+    if (nativeApp) {
+        const dataUrl = await takePhoto();
+        if (dataUrl) loadImageFromDataUrl(dataUrl);
+    } else {
+        cameraInput.click();
+    }
+});
 resetBtn.addEventListener('click', returnToIntro);
 
 copyLinkBtn.addEventListener('click', copyLanLink);
@@ -2249,6 +2410,7 @@ rightBtn.addEventListener('touchcancel', (e) => {
 jumpBtn.addEventListener('touchstart', (e) => {
     e.preventDefault();
     touchJumpingRef.value = true;
+    hapticLight();  // Haptic feedback on jump
 });
 jumpBtn.addEventListener('touchend', (e) => {
     e.preventDefault();
@@ -2320,6 +2482,139 @@ zoomResetBtn.addEventListener('touchstart', (e) => {
     e.preventDefault();
     camera.zoom = camera.autoFitZoom;
 });
+
+// ── Pause / Victory overlay event listeners ─────────────────────
+
+if (pauseBtn) {
+    pauseBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        pauseGame();
+    });
+    pauseBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        pauseGame();
+    });
+}
+
+if (resumeBtn) {
+    resumeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        resumeGame();
+    });
+}
+
+if (restartLevelBtn) {
+    restartLevelBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        resumeGame();
+        if (backgroundImage) {
+            gameRunning = false;
+            setTimeout(() => { processImage(backgroundImage); }, 50);
+        }
+    });
+}
+
+if (newPhotoBtn) {
+    newPhotoBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        returnToMainMenu();
+    });
+}
+
+if (mainMenuBtn) {
+    mainMenuBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        returnToMainMenu();
+    });
+}
+
+if (playAgainBtn) {
+    playAgainBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        hideVictoryScreen();
+        if (backgroundImage) {
+            gameRunning = false;
+            setTimeout(() => { processImage(backgroundImage); }, 50);
+        }
+    });
+}
+
+if (victoryNewPhotoBtn) {
+    victoryNewPhotoBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        returnToMainMenu();
+    });
+}
+
+if (victoryMainMenuBtn) {
+    victoryMainMenuBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        returnToMainMenu();
+    });
+}
+
+// Mobile respawn button (thumb-zone layout)
+if (respawnBtnMobile) {
+    respawnBtnMobile.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (player && gameRunning) player.respawn();
+    });
+    respawnBtnMobile.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (player && gameRunning) player.respawn();
+    });
+}
+
+// ── Native app initialization ───────────────────────────────────
+
+if (nativeApp) {
+    // Auto-enable ML-only mode for native app
+    mlDetectionEnabled = true;
+    mlOnlyMode = true;
+
+    // Hide status bar and lock landscape
+    hideStatusBar();
+    lockLandscape();
+
+    // Handle Android back button
+    onBackButton(() => {
+        if (victoryOverlay && victoryOverlay.classList.contains('visible')) {
+            returnToMainMenu();
+        } else if (gamePaused) {
+            resumeGame();
+        } else if (gameRunning) {
+            pauseGame();
+        }
+        return true; // Prevent default back behavior
+    });
+
+    // Handle app lifecycle (pause on background)
+    onAppStateChange({
+        onPause: () => {
+            if (gameRunning && !gamePaused) pauseGame();
+        },
+        onResume: () => {
+            // Don't auto-resume — let user tap Resume
+        }
+    });
+
+    // Auto-load ML model on startup
+    (async () => {
+        showMlLoading(10, 'Loading ML model...');
+        const success = await initONNXModel({ onStatus: (status) => {
+            updateMLStatus(status);
+            showMlLoading(20, status);
+        }});
+        hideMlLoading();
+        if (success) {
+            updateMLStatus('ML ready');
+            console.log('✅ ML model auto-loaded for native app');
+        } else {
+            console.warn('⚠️ ML model failed to load — grid fallback will be used');
+        }
+        updateDetectionModeBadge();
+    })();
+}
 
 // Register Service Worker for PWA/offline support
 if ('serviceWorker' in navigator) {

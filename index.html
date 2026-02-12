@@ -15,6 +15,8 @@
     <!-- Icons -->
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
     <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png">
+    <!-- Android game app overrides -->
+    <link rel="stylesheet" href="css/android-game.css">
     <style>
         * {
             margin: 0;
@@ -783,11 +785,16 @@
             <canvas id="previewCanvas" class="preview-canvas"></canvas>
         </div>
 
-        <!-- Mobile control buttons -->
+        <!-- Mobile control buttons — thumb-zone layout for native app -->
         <div class="mobile-controls" id="mobileControls">
-            <button class="control-btn" id="leftBtn" aria-label="Move left">◀</button>
-            <button class="control-btn jump-btn" id="jumpBtn" aria-label="Jump">▲</button>
-            <button class="control-btn" id="rightBtn" aria-label="Move right">▶</button>
+            <div class="movement-group">
+                <button class="control-btn" id="leftBtn" aria-label="Move left">◀</button>
+                <button class="control-btn" id="rightBtn" aria-label="Move right">▶</button>
+            </div>
+            <div class="action-group">
+                <button class="control-btn action-btn" id="respawnBtnMobile" aria-label="Respawn">R</button>
+                <button class="control-btn jump-btn" id="jumpBtn" aria-label="Jump">▲</button>
+            </div>
         </div>
 
         <!-- Zoom & game action control buttons -->
@@ -859,6 +866,40 @@
                     <div id="feedbackStatus" class="status" aria-live="polite"></div>
                 </form>
             </div>
+        </div>
+
+        <!-- Pause button (visible in native app mode) -->
+        <button class="pause-btn" id="pauseBtn" aria-label="Pause game">⏸</button>
+
+        <!-- Pause menu overlay -->
+        <div class="pause-overlay" id="pauseOverlay">
+            <h2>Paused</h2>
+            <button class="pause-menu-btn primary" id="resumeBtn">▶ Resume</button>
+            <button class="pause-menu-btn secondary" id="restartLevelBtn">🔄 Restart Level</button>
+            <button class="pause-menu-btn secondary" id="newPhotoBtn">📷 New Photo</button>
+            <button class="pause-menu-btn secondary" id="mainMenuBtn">🏠 Main Menu</button>
+        </div>
+
+        <!-- Victory screen overlay -->
+        <div class="victory-overlay" id="victoryOverlay">
+            <h2>🎉 Level Complete!</h2>
+            <div class="victory-stats" id="victoryStats">
+                <div>Score: <span class="stat-value" id="victoryScore">0</span></div>
+                <div>Time: <span class="stat-value" id="victoryTime">0</span>s</div>
+                <div>Word: <span class="stat-value" id="victoryWord">—</span></div>
+            </div>
+            <button class="pause-menu-btn primary" id="playAgainBtn">🔄 Play Again</button>
+            <button class="pause-menu-btn secondary" id="victoryNewPhotoBtn">📷 New Photo</button>
+            <button class="pause-menu-btn secondary" id="victoryMainMenuBtn">🏠 Main Menu</button>
+        </div>
+
+        <!-- ML loading overlay -->
+        <div class="ml-loading-overlay" id="mlLoadingOverlay">
+            <div class="loading-title">🤖 Detecting Objects...</div>
+            <div class="loading-bar-track">
+                <div class="loading-bar-fill" id="mlLoadingBar"></div>
+            </div>
+            <div class="loading-tip" id="mlLoadingTip">Analyzing your photo with AI to create platforms</div>
         </div>
     </div>
 
