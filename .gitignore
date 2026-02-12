@@ -25,3 +25,16 @@ temp/
 # ML Runtime files (optional - can use CDN)
 lib/ort*.wasm
 lib/ort*.js
+
+# Capacitor build artifacts
+www/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/app/build/
+android/app/release/
+android/.gradle/
+android/build/
+*.apk
+*.aab
+*.keystore
