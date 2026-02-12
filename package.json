@@ -6,11 +6,26 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "cap:copy": "rsync -a --delete --exclude='node_modules' --exclude='.git' --exclude='android' --exclude='www' --exclude='feedback' --exclude='tmp' --exclude='temp' --exclude='learning' --exclude='ejs-docs' --exclude='docs' --exclude='.github' --exclude='package-lock.json' --exclude='capacitor.config.ts' . www/ && npx cap copy android",
+    "cap:sync": "npm run cap:copy && npx cap sync android",
+    "cap:open": "npx cap open android",
     "feedback:issues": "node scripts/feedback-to-issues.js",
     "learning:note": "node scripts/new-learning-note.js",
     "icons": "node scripts/generate-icons.js"
   },
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/camera": "^8.0.0",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/haptics": "^8.0.0",
+    "@capacitor/screen-orientation": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0",
     "express": "^4.22.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }

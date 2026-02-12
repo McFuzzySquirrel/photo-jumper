@@ -8,9 +8,11 @@ const OFFLINE_CACHE_NAME = 'photo-jumper-offline-v2';
 const CORE_ASSETS = [
   '/',
   '/index.html',
+  '/css/android-game.css',
   '/js/main.js',
   '/js/config.js',
   '/js/runtime.js',
+  '/js/platform/native-bridge.js',
   '/js/detection/ml.js',
   '/js/detection/grid.js',
   '/js/detection/pipeline.js',
