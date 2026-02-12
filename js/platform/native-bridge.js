@@ -2,7 +2,10 @@
  * native-bridge.js — Capacitor plugin wrappers for Photo Jumper
  *
  * Provides a unified API that works on both web and native (Capacitor).
- * On web, functions gracefully degrade or use web APIs as fallbacks.
+ * On web, functions gracefully degrade (no-op).
+ *
+ * In native mode, plugins are accessed via the Capacitor runtime which
+ * registers them on window.Capacitor.Plugins — no external imports needed.
  */
 
 // Detect Capacitor native environment
@@ -12,91 +15,81 @@ export const isNative = () =>
     window.Capacitor.isNativePlatform &&
     window.Capacitor.isNativePlatform();
 
-// ── Haptics ─────────────────────────────────────────────────────────
-
-let Haptics = null;
-let ImpactStyle = null;
-let NotificationType = null;
-
-async function loadHaptics() {
-    if (Haptics) return;
-    if (!isNative()) return;
+/**
+ * Safely get a Capacitor plugin by name.
+ * Returns null if not available (web mode or plugin not installed).
+ */
+function getPlugin(name) {
     try {
-        const mod = await import('https://esm.sh/@capacitor/haptics');
-        Haptics = mod.Haptics;
-        ImpactStyle = mod.ImpactStyle;
-        NotificationType = mod.NotificationType;
+        if (!isNative()) return null;
+        return window.Capacitor?.Plugins?.[name] || null;
     } catch {
-        // Haptics not available — silent fallback
+        return null;
     }
 }
 
+// ── Haptics ─────────────────────────────────────────────────────────
+
 /** Light haptic tap — for jump */
 export async function hapticLight() {
-    await loadHaptics();
-    if (!Haptics) return;
-    try { await Haptics.impact({ style: ImpactStyle.Light }); } catch { /* noop */ }
+    const haptics = getPlugin('Haptics');
+    if (!haptics) return;
+    try { await haptics.impact({ style: 'Light' }); } catch { /* not available */ }
 }
 
 /** Medium haptic tap — for letter collection */
 export async function hapticMedium() {
-    await loadHaptics();
-    if (!Haptics) return;
-    try { await Haptics.impact({ style: ImpactStyle.Medium }); } catch { /* noop */ }
+    const haptics = getPlugin('Haptics');
+    if (!haptics) return;
+    try { await haptics.impact({ style: 'Medium' }); } catch { /* not available */ }
 }
 
 /** Success notification — for goal reached / win */
 export async function hapticSuccess() {
-    await loadHaptics();
-    if (!Haptics) return;
-    try { await Haptics.notification({ type: NotificationType.Success }); } catch { /* noop */ }
+    const haptics = getPlugin('Haptics');
+    if (!haptics) return;
+    try { await haptics.notification({ type: 'SUCCESS' }); } catch { /* not available */ }
 }
 
 // ── Status Bar ──────────────────────────────────────────────────────
 
 /** Hide the system status bar for immersive gameplay */
 export async function hideStatusBar() {
-    if (!isNative()) return;
-    try {
-        const { StatusBar } = await import('https://esm.sh/@capacitor/status-bar');
-        await StatusBar.hide();
-    } catch { /* noop */ }
+    const statusBar = getPlugin('StatusBar');
+    if (!statusBar) return;
+    try { await statusBar.hide(); } catch { /* not available */ }
 }
 
 /** Show the system status bar */
 export async function showStatusBar() {
-    if (!isNative()) return;
-    try {
-        const { StatusBar } = await import('https://esm.sh/@capacitor/status-bar');
-        await StatusBar.show();
-    } catch { /* noop */ }
+    const statusBar = getPlugin('StatusBar');
+    if (!statusBar) return;
+    try { await statusBar.show(); } catch { /* not available */ }
 }
 
 // ── Screen Orientation ──────────────────────────────────────────────
 
 /** Lock to landscape (native only — web uses screen.orientation API) */
 export async function lockLandscape() {
-    if (!isNative()) return;
-    try {
-        const { ScreenOrientation } = await import('https://esm.sh/@capacitor/screen-orientation');
-        await ScreenOrientation.lock({ orientation: 'landscape' });
-    } catch { /* noop */ }
+    const orientation = getPlugin('ScreenOrientation');
+    if (!orientation) return;
+    try { await orientation.lock({ orientation: 'landscape' }); } catch { /* not available */ }
 }
 
 // ── App Lifecycle ───────────────────────────────────────────────────
 
 /**
  * Register a handler for Android back button.
- * @param {Function} handler — called when back is pressed; return true to prevent default
+ * @param {Function} handler — called when back is pressed
  */
 export async function onBackButton(handler) {
-    if (!isNative()) return;
+    const app = getPlugin('App');
+    if (!app) return;
     try {
-        const { App } = await import('https://esm.sh/@capacitor/app');
-        App.addListener('backButton', ({ canGoBack }) => {
+        app.addListener('backButton', ({ canGoBack }) => {
             handler(canGoBack);
         });
-    } catch { /* noop */ }
+    } catch { /* not available */ }
 }
 
 /**
@@ -104,14 +97,14 @@ export async function onBackButton(handler) {
  * @param {{ onPause: Function, onResume: Function }} handlers
  */
 export async function onAppStateChange(handlers) {
-    if (!isNative()) return;
+    const app = getPlugin('App');
+    if (!app) return;
     try {
-        const { App } = await import('https://esm.sh/@capacitor/app');
-        App.addListener('appStateChange', ({ isActive }) => {
+        app.addListener('appStateChange', ({ isActive }) => {
             if (isActive && handlers.onResume) handlers.onResume();
             if (!isActive && handlers.onPause) handlers.onPause();
         });
-    } catch { /* noop */ }
+    } catch { /* not available */ }
 }
 
 // ── Camera ──────────────────────────────────────────────────────────
@@ -121,13 +114,13 @@ export async function onAppStateChange(handlers) {
  * @returns {Promise<string|null>} Data URL of the photo, or null if cancelled
  */
 export async function takePhoto() {
-    if (!isNative()) return null; // Let web use its own file input
+    const camera = getPlugin('Camera');
+    if (!camera) return null; // Let web use its own file input
     try {
-        const { Camera, CameraResultType, CameraSource } = await import('https://esm.sh/@capacitor/camera');
-        const photo = await Camera.getPhoto({
+        const photo = await camera.getPhoto({
             quality: 80,
-            resultType: CameraResultType.DataUrl,
-            source: CameraSource.Camera,
+            resultType: 'dataUrl',
+            source: 'CAMERA',
             width: 1280,
             height: 960,
         });
@@ -142,13 +135,13 @@ export async function takePhoto() {
  * @returns {Promise<string|null>} Data URL of the photo, or null if cancelled
  */
 export async function choosePhoto() {
-    if (!isNative()) return null; // Let web use its own file input
+    const camera = getPlugin('Camera');
+    if (!camera) return null; // Let web use its own file input
     try {
-        const { Camera, CameraResultType, CameraSource } = await import('https://esm.sh/@capacitor/camera');
-        const photo = await Camera.getPhoto({
+        const photo = await camera.getPhoto({
             quality: 80,
-            resultType: CameraResultType.DataUrl,
-            source: CameraSource.Photos,
+            resultType: 'dataUrl',
+            source: 'PHOTOS',
             width: 1280,
             height: 960,
         });

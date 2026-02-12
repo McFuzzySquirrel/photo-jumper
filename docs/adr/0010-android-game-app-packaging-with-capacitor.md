@@ -1,6 +1,6 @@
 # ADR 0010: Android Game App Packaging with Capacitor
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-02-12
 
 ## Context
