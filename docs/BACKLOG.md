@@ -6,15 +6,24 @@ Items discovered during the full PRD build session (2026-03-30). Prioritized for
 
 ## 🔴 Bugs
 
-### BUG-001: Infinite loop in helper platform insertion
-- **File**: `js/detection/helpers.js`
-- **Severity**: High
-- **Found by**: @qa-tester (Phase 4.2 automated tests)
-- **Description**: `addHelpers()` returns `candidates.length > 0` instead of tracking whether any helper was *actually placed*. When strategies generate candidates but none pass `canReachPlatform`/`isWithinBounds` checks, `placed` is set to `true` but `failedAttempts` never increments — causing an infinite loop.
-- **Trigger**: Platform gaps exceeding `maxJumpUp` (~196px) to the midpoint helper position.
-- **Workaround**: Tests use moderate gaps and stub callbacks. In production, most photo-generated levels don't hit this because the skeleton fallback ensures traversable geometry.
-- **Fix approach**: Track whether a helper was actually added (not just whether candidates were generated). Increment `failedAttempts` when no candidate passes placement checks. Add a hard iteration cap as safety net.
-- **Agent**: @detection-engineer or @gameplay-engineer
+### ~~BUG-001: Infinite loop in helper platform insertion~~ ✅ RESOLVED
+- **Fixed in**: `402b109` (2026-03-30)
+- **Fix**: `addHelpers()` now returns actual placement boolean (`added > addedBefore`), MAX_ITERATIONS=50 hard cap, stall detection. 2 regression tests added.
+- **Agent**: @gameplay-engineer
+
+### BUG-002: Letter placement fails on low-platform levels
+- **File**: `js/main.js` — `placeLettersOnPlatforms()`
+- **Severity**: Medium
+- **Found by**: Android emulator testing (2026-03-30)
+- **Description**: When ML detection produces few platforms (≤7) and the goal gets relocated to the bottom, strict filtering (exclude start, goal, ceiling-blocked) leaves zero eligible platforms for letter placement.
+- **Status**: ✅ RESOLVED in `81b634b` — 3-tier fallback: added 'start' kind, relaxed fallback includes goal, goal letters offset from portal.
+
+### BUG-003: Native UI element overlap
+- **File**: `css/android-game.css`
+- **Severity**: Low
+- **Found by**: Android emulator testing (2026-03-30)
+- **Description**: Detection-mode-badge, pause button, and game-info HTML element overlapped in the top-right corner on native Android. Game-info was visible despite being canvas-drawn in native mode.
+- **Status**: ✅ RESOLVED in `66a4b86` — Hidden debug/detection elements, forced game-info hidden, word-bar constrained.
 
 ---
 
@@ -43,3 +52,7 @@ Items discovered during the full PRD build session (2026-03-30). Prioritized for
 ### ENHANCE-002: Service worker cache for seg model
 - **Description**: `models/yolov8n-seg.onnx` (SEG_MODEL_URLS) is not in SW `ML_ASSETS`. Once the model is available on disk or CDN, add it to the caching strategy in `sw.js`.
 - **Agent**: @project-architect
+
+### ENHANCE-003: Goal reachability before letter placement
+- **Description**: When goal is relocated to a lower platform (unreachable from upper ML platforms), letters can't be placed on those upper platforms either. Consider running letter placement *after* goal relocation and helper insertion for better platform pool.
+- **Agent**: @gameplay-engineer
