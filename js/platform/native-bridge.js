@@ -51,6 +51,20 @@ export async function hapticSuccess() {
     try { await haptics.notification({ type: 'SUCCESS' }); } catch { /* not available */ }
 }
 
+/** Warning notification — for death / respawn */
+export async function hapticWarning() {
+    const haptics = getPlugin('Haptics');
+    if (!haptics) return;
+    try { await haptics.notification({ type: 'WARNING' }); } catch { /* not available */ }
+}
+
+/** Heavy impact — alternative strong feedback for significant events */
+export async function hapticHeavy() {
+    const haptics = getPlugin('Haptics');
+    if (!haptics) return;
+    try { await haptics.impact({ style: 'Heavy' }); } catch { /* not available */ }
+}
+
 // ── Status Bar ──────────────────────────────────────────────────────
 
 /** Hide the system status bar for immersive gameplay */
@@ -65,6 +79,20 @@ export async function showStatusBar() {
     const statusBar = getPlugin('StatusBar');
     if (!statusBar) return;
     try { await statusBar.show(); } catch { /* not available */ }
+}
+
+/**
+ * Enter full immersive mode — hide both status bar and navigation bar.
+ * Uses StatusBar plugin for status bar and NavigationBar plugin if available.
+ * Falls back gracefully if NavigationBar plugin is not installed.
+ */
+export async function enterImmersiveMode() {
+    await hideStatusBar();
+    // NavigationBar plugin (optional — @nicoo/capacitor-navigation-bar or similar)
+    const navBar = getPlugin('NavigationBar');
+    if (navBar) {
+        try { await navBar.hide(); } catch { /* not available */ }
+    }
 }
 
 // ── Screen Orientation ──────────────────────────────────────────────

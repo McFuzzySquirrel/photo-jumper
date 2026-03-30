@@ -889,6 +889,7 @@
                 <div>Word: <span class="stat-value" id="victoryWord">—</span></div>
             </div>
             <button class="pause-menu-btn primary" id="playAgainBtn">🔄 Play Again</button>
+            <button class="pause-menu-btn share-btn" id="shareBtn" style="display:none;">📤 Share Score</button>
             <button class="pause-menu-btn secondary" id="victoryNewPhotoBtn">📷 New Photo</button>
             <button class="pause-menu-btn secondary" id="victoryMainMenuBtn">🏠 Main Menu</button>
         </div>
@@ -901,6 +902,12 @@
             </div>
             <div class="loading-tip" id="mlLoadingTip">Analyzing your photo with AI to create platforms</div>
         </div>
+    </div>
+
+    <!-- Rotate hint for portrait mode (native only, styled via android-game.css) -->
+    <div class="rotate-hint" id="rotateHint">
+        <div class="rotate-icon">📱↪️</div>
+        <div>Rotate your device to landscape mode</div>
     </div>
 
     <script type="module" src="js/main.js"></script>

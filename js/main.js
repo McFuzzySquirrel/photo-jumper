@@ -72,6 +72,9 @@ import {
     hapticLight,
     hapticMedium,
     hapticSuccess,
+    hapticWarning,
+    hapticHeavy,
+    enterImmersiveMode,
     hideStatusBar,
     lockLandscape,
     onBackButton,
@@ -2277,6 +2280,7 @@ document.addEventListener('keydown', (e) => {
     // Manual respawn with 'R' key
     if ((e.key === 'r' || e.key === 'R') && player && gameRunning) {
         player.respawn();
+        hapticWarning();  // Haptic feedback on respawn
         e.preventDefault();
         return;
     }
@@ -2442,11 +2446,11 @@ zoomResetBtn.addEventListener('click', (e) => {
 // Respawn button (R)
 respawnBtn.addEventListener('click', (e) => {
     e.preventDefault();
-    if (player && gameRunning) player.respawn();
+    if (player && gameRunning) { player.respawn(); hapticWarning(); }
 });
 respawnBtn.addEventListener('touchstart', (e) => {
     e.preventDefault();
-    if (player && gameRunning) player.respawn();
+    if (player && gameRunning) { player.respawn(); hapticWarning(); }
 });
 
 // Regenerate level button (G)
@@ -2557,11 +2561,11 @@ if (victoryMainMenuBtn) {
 if (respawnBtnMobile) {
     respawnBtnMobile.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        if (player && gameRunning) player.respawn();
+        if (player && gameRunning) { player.respawn(); hapticWarning(); }
     });
     respawnBtnMobile.addEventListener('click', (e) => {
         e.preventDefault();
-        if (player && gameRunning) player.respawn();
+        if (player && gameRunning) { player.respawn(); hapticWarning(); }
     });
 }
 
@@ -2572,8 +2576,8 @@ if (nativeApp) {
     mlDetectionEnabled = true;
     mlOnlyMode = true;
 
-    // Hide status bar and lock landscape
-    hideStatusBar();
+    // Enter immersive mode (hide status bar + nav bar) and lock landscape
+    enterImmersiveMode();
     lockLandscape();
 
     // Handle Android back button
@@ -2595,8 +2599,35 @@ if (nativeApp) {
         },
         onResume: () => {
             // Don't auto-resume — let user tap Resume
+            // Re-enter immersive mode in case system UI was restored
+            enterImmersiveMode();
         }
     });
+
+    // Wire up Share button (native only — uses Web Share API)
+    const shareBtn = document.getElementById('shareBtn');
+    if (shareBtn) {
+        // Show share button only if Web Share API is available
+        if (navigator.share) {
+            shareBtn.style.display = '';
+        }
+        shareBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const scoreText = victoryScore?.textContent || '0';
+            const timeText = victoryTime?.textContent || '0';
+            const wordText = victoryWord?.textContent || '';
+            try {
+                await navigator.share({
+                    title: 'Photo Jumper',
+                    text: `I scored ${scoreText} points in ${timeText}s on Photo Jumper! ${wordText.includes('✓') ? 'Collected all letters! 🏆' : ''}`,
+                    url: 'https://photo-jumper.app',
+                });
+                hapticSuccess();
+            } catch {
+                // User cancelled or share failed — no-op
+            }
+        });
+    }
 
     // Auto-load ML model on startup
     (async () => {
