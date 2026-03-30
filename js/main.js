@@ -1212,16 +1212,21 @@ function placeLettersOnPlatforms(startPlatform, limits) {
     letters = [];
     collectedLetters = [];
     
-    // Get platforms that are suitable for letter placement AND reachable from start
-    // Exclude ground, start, goal platforms and those with ceilings blocking letter access
     const jumpHeight = limits.maxJumpUp;
-    const suitablePlatforms = platforms.filter(p => {
-        // Must be a photo/ml/helper platform (NOT goal)
-        if (p.kind !== 'photo' && p.kind !== 'ml' && p.kind !== 'ml-seg' && p.kind !== 'helper') {
+    const shortestWordLen = SHORTEST_WORD.length;  // typically 3
+    
+    // ── Primary filter ──────────────────────────────────────────────
+    // Reachable photo/ml/helper/start platforms (not goal), no ceiling.
+    // The start platform is included because it is trivially reachable —
+    // the player spawns there and can always collect a letter on it.
+    const primaryPlatforms = platforms.filter(p => {
+        // Allow photo, ml, ml-seg, helper, AND start platforms
+        if (p.kind !== 'photo' && p.kind !== 'ml' && p.kind !== 'ml-seg'
+            && p.kind !== 'helper' && p.kind !== 'start') {
             return false;
         }
         
-        // Don't place letters on goal platform
+        // Don't place letters on goal platform in primary pass
         if (p === goalPlatform) {
             return false;
         }
@@ -1240,6 +1245,31 @@ function placeLettersOnPlatforms(startPlatform, limits) {
         
         return true;
     });
+    
+    // ── Relaxed fallback ────────────────────────────────────────────
+    // When the primary filter finds too few platforms for even the shortest
+    // word, relax the criteria: include the goal platform (letters are offset
+    // from the portal) and drop the ceiling-above check (the player can still
+    // land on the platform even if there's a ceiling — the letter is just
+    // slightly harder to grab).
+    let suitablePlatforms = primaryPlatforms;
+    if (suitablePlatforms.length < shortestWordLen) {
+        console.log(`Primary letter filter found ${suitablePlatforms.length} platform(s) `
+            + `(need ${shortestWordLen}) — trying relaxed filter`);
+        suitablePlatforms = platforms.filter(p => {
+            // Allow all gameplay platform kinds including goal and start
+            if (p.kind !== 'photo' && p.kind !== 'ml' && p.kind !== 'ml-seg'
+                && p.kind !== 'helper' && p.kind !== 'start' && p.kind !== 'goal') {
+                return false;
+            }
+            // Start platform is trivially reachable from itself
+            if (p !== startPlatform && !isReachable(startPlatform, p, platforms, limits)) {
+                return false;
+            }
+            return true;
+        });
+        console.log(`Relaxed filter found ${suitablePlatforms.length} platform(s)`);
+    }
     
     if (suitablePlatforms.length === 0) {
         console.warn('No suitable reachable platforms for letter placement');
@@ -1281,14 +1311,30 @@ function placeLettersOnPlatforms(startPlatform, limits) {
             continue;
         }
         
-        // Place letter on top of platform, centered with some randomness
+        // Place letter on top of platform, centered with some randomness.
+        // When placing on the goal platform, offset to the left or right
+        // edge so the letter doesn't overlap with the portal in the center.
         const letterSize = getScaledLetterSize();
-        const platformCenterX = platform.x + platform.width / 2;
-        const randomOffsetX = (Math.random() - 0.5) * Math.min(
-            platform.width * COLLECTIBLE_LETTER_OFFSET_RATIO, 
-            COLLECTIBLE_LETTER_MAX_OFFSET
-        );
-        const letterX = platformCenterX + randomOffsetX - letterSize / 2;
+        let letterX;
+        if (platform === goalPlatform && goal) {
+            // Portal occupies the center — place letter on the left or right third
+            const portalCenterX = goal.x + (getScaledBlockSize());
+            const useLeftSide = (i % 2 === 0);
+            if (useLeftSide) {
+                letterX = platform.x + letterSize * 0.25;
+            } else {
+                letterX = platform.x + platform.width - letterSize * 1.25;
+            }
+            // Clamp within platform bounds
+            letterX = Math.max(platform.x, Math.min(letterX, platform.x + platform.width - letterSize));
+        } else {
+            const platformCenterX = platform.x + platform.width / 2;
+            const randomOffsetX = (Math.random() - 0.5) * Math.min(
+                platform.width * COLLECTIBLE_LETTER_OFFSET_RATIO, 
+                COLLECTIBLE_LETTER_MAX_OFFSET
+            );
+            letterX = platformCenterX + randomOffsetX - letterSize / 2;
+        }
         const letterY = platform.y - letterSize - COLLECTIBLE_LETTER_VERTICAL_OFFSET;
         
         letters.push(new Letter(targetWord[i], letterX, letterY, i));
