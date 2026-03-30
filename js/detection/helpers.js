@@ -40,8 +40,9 @@ export function addHelperPlatformsIfNeeded(options) {
     }
 
     function addHelpers(candidates, target) {
+        const addedBefore = added;
         for (const helper of candidates) {
-            if (added >= maxHelpers) return true;
+            if (added >= maxHelpers) break;
             if (overlapsAny(helper, allPlatforms)) continue;
             if (!isWithinBounds(helper)) continue;
             if (!canReachPlatform(current, helper, limits, allPlatforms)) continue;
@@ -51,7 +52,7 @@ export function addHelperPlatformsIfNeeded(options) {
             current = helper;
             added++;
         }
-        return candidates.length > 0;
+        return added > addedBefore;  // BUG-001 fix: only true if a helper was actually placed
     }
 
     function midpointHelper(from, to) {
@@ -125,7 +126,12 @@ export function addHelperPlatformsIfNeeded(options) {
         return dx + dy * 1.2;
     }
 
-    while (added < maxHelpers && failedAttempts < maxFailedAttempts) {
+    // BUG-001 fix: hard iteration cap prevents infinite loops under any condition
+    const MAX_ITERATIONS = 50;
+    let iterations = 0;
+
+    while (added < maxHelpers && failedAttempts < maxFailedAttempts && iterations < MAX_ITERATIONS) {
+        iterations++;
         if (isReachable(startPlatform, goalPlatform, allPlatforms, limits)) {
             return;
         }
@@ -137,6 +143,7 @@ export function addHelperPlatformsIfNeeded(options) {
 
         const target = candidates[0] || goalPlatform;
 
+        const currentBefore = current;
         let placed = false;
         for (const strategy of strategies) {
             const helpers = strategy(current, target);
@@ -146,7 +153,9 @@ export function addHelperPlatformsIfNeeded(options) {
             }
         }
 
-        if (!placed) {
+        // BUG-001 fix: increment failedAttempts if nothing was placed OR
+        // current didn't advance (belt-and-suspenders safety)
+        if (!placed || current === currentBefore) {
             failedAttempts++;
         }
     }

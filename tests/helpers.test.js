@@ -78,11 +78,10 @@ const LIMITS = {
 // Helper to build options with defaults, reducing test boilerplate.
 //
 // IMPORTANT: Test scenarios use a moderate gap (200px vertical) that is
-// bridgeable by a single midpoint helper. Larger gaps (>196px to midpoint)
-// can trigger a known production issue where the while-loop doesn't
-// terminate (addHelpers returns candidates.length > 0 even when no helper
-// was placed, so failedAttempts never increments). Tests that need to
-// verify maxHelpers limit use stub callbacks to avoid this.
+// bridgeable by a single midpoint helper. Tests that need to verify
+// maxHelpers limit or edge cases use stub callbacks for determinism.
+// BUG-001 (infinite loop when candidates existed but none placed) is
+// fixed and covered by dedicated regression tests below.
 // ---------------------------------------------------------------------------
 function makeOptions(overrides = {}) {
     const start = overrides.startPlatform || new Platform(40, 400, 80, BLOCK_SIZE, '#000', 'start');
@@ -283,6 +282,54 @@ describe('addHelperPlatformsIfNeeded', () => {
         // Should have added helpers in first iteration, then stopped when isReachable returned true
         expect(debugHelpers.length).toBeGreaterThan(0);
         expect(debugHelpers.length).toBeLessThan(10);
+    });
+
+    // ----- BUG-001 regression tests ------------------------------------------
+
+    it('terminates when candidates exist but all fail reachability (BUG-001)', () => {
+        // Reproduces the infinite-loop bug: strategies generate non-empty
+        // candidate arrays, but canReachPlatform rejects every helper.
+        // Before the fix, addHelpers returned `candidates.length > 0` (true)
+        // even when nothing was placed, so failedAttempts never incremented.
+        const start = new Platform(40, 400, 80, BLOCK_SIZE, '#000', 'start');
+        const goal = new Platform(700, 50, 80, BLOCK_SIZE, '#000', 'goal');
+        const allPlatforms = [start, goal];
+        const debugHelpers = [];
+
+        addHelperPlatformsIfNeeded(makeOptions({
+            startPlatform: start,
+            goalPlatform: goal,
+            allPlatforms,
+            debugHelperPlatforms: debugHelpers,
+            maxHelpers: 10,
+            isReachable: () => false,
+            canReachPlatform: () => false, // nothing reachable → all candidates rejected
+            overlapsAny: () => false,
+        }));
+
+        // Must terminate; no helpers placed since none passed validation
+        expect(debugHelpers).toHaveLength(0);
+    });
+
+    it('terminates when candidates exist but all fail overlap checks (BUG-001)', () => {
+        // All candidates overlap existing platforms → nothing placed.
+        const start = new Platform(40, 400, 80, BLOCK_SIZE, '#000', 'start');
+        const goal = new Platform(350, 200, 80, BLOCK_SIZE, '#000', 'goal');
+        const allPlatforms = [start, goal];
+        const debugHelpers = [];
+
+        addHelperPlatformsIfNeeded(makeOptions({
+            startPlatform: start,
+            goalPlatform: goal,
+            allPlatforms,
+            debugHelperPlatforms: debugHelpers,
+            maxHelpers: 10,
+            isReachable: () => false,
+            canReachPlatform: (from, to) => from !== to,
+            overlapsAny: () => true, // everything overlaps → all candidates rejected
+        }));
+
+        expect(debugHelpers).toHaveLength(0);
     });
 
     it('does not add helpers when maxHelpers is 0', () => {
