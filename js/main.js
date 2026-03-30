@@ -97,6 +97,7 @@ const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
 const container = document.querySelector('.container');
 const gameCanvasContainer = document.querySelector('.game-canvas-container');
 
+const uploadSection = document.querySelector('.upload-section');
 const uploadBtn = document.getElementById('uploadBtn');
 const cameraBtn = document.getElementById('cameraBtn');
 const resetBtn = document.getElementById('resetBtn');
@@ -1305,6 +1306,8 @@ function startGame() {
     resetBtn.style.display = 'inline-block';
     uploadBtn.style.display = 'none';
     cameraBtn.style.display = 'none';
+    // Hide entire upload section overlay (native mode photo-picker)
+    if (uploadSection) uploadSection.style.display = 'none';
     
     // Show detection mode badge
     detectionModeBadge.classList.add('visible');
@@ -1891,6 +1894,8 @@ function resetGame() {
     resetBtn.style.display = 'none';
     uploadBtn.style.display = 'inline-block';
     cameraBtn.style.display = 'inline-block';
+    // Restore upload section overlay visibility (native mode photo-picker)
+    if (uploadSection) uploadSection.style.display = '';
 }
 
 function guessDeviceType() {
@@ -2086,10 +2091,16 @@ async function copyLanLink() {
 }
 
 // Event listeners
-splashPlayBtn.addEventListener('click', () => {
+splashPlayBtn.addEventListener('click', async () => {
     if (nativeApp) {
-        // Native mode: skip intro, go directly to game screen
+        // Native mode: show game screen, then auto-open gallery picker.
+        // If the user cancels the picker they'll land on the upload-section
+        // overlay with Gallery / Camera buttons as a fallback.
         showGameScreen();
+        const dataUrl = await choosePhoto();
+        if (dataUrl) {
+            loadImageFromDataUrl(dataUrl);
+        }
     } else {
         showIntroScreen();
     }

@@ -123,9 +123,88 @@ body.native-app .game-screen.active {
     flex-direction: column;
 }
 
-body.native-app .game-screen h1,
-body.native-app .game-screen .upload-section {
+body.native-app .game-screen h1 {
     display: none;
+}
+
+/* ── Upload Section — native photo-picker overlay ──────────────────── */
+/* Shown as a centered overlay on the game screen so users can pick a
+   photo after the splash "Let's Jump!" tap, or if they cancel the
+   auto-triggered gallery picker.  Hidden once the game starts via
+   inline style set by startGame().                                     */
+
+body.native-app .game-screen .upload-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 24px;
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    background: linear-gradient(
+        180deg,
+        rgba(26, 26, 46, 0.92) 0%,
+        rgba(26, 26, 46, 0.98) 100%
+    );
+}
+
+body.native-app .game-screen .upload-section .button-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 320px;
+}
+
+/* Native photo-picker buttons — large touch targets, splash gradient */
+body.native-app .game-screen .upload-section #uploadBtn,
+body.native-app .game-screen .upload-section #cameraBtn {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    /* 56dp tall — exceeds 48dp minimum touch target (ACC-02) */
+    min-height: 56px;
+    padding: 14px 24px;
+    font-size: 1.15em;
+    font-weight: bold;
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-radius: 16px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: transform 0.12s ease-out,
+                box-shadow 0.12s ease-out,
+                background 0.12s ease-out;
+}
+
+body.native-app .game-screen .upload-section #uploadBtn {
+    /* Primary action: gallery pick — splash pink-to-red gradient */
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    box-shadow: 0 6px 24px rgba(240, 147, 251, 0.35);
+}
+
+body.native-app .game-screen .upload-section #uploadBtn:active {
+    transform: scale(0.96);
+    box-shadow: 0 2px 10px rgba(240, 147, 251, 0.5);
+    background: linear-gradient(135deg, #f5a8fd 0%, #f7707e 100%);
+}
+
+body.native-app .game-screen .upload-section #cameraBtn {
+    /* Secondary action: camera — splash purple-to-indigo gradient */
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 6px 24px rgba(102, 126, 234, 0.3);
+}
+
+body.native-app .game-screen .upload-section #cameraBtn:active {
+    transform: scale(0.96);
+    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.45);
+    background: linear-gradient(135deg, #7b93ff 0%, #8c5fbf 100%);
 }
 
 body.native-app .game-canvas-container {
