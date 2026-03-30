@@ -136,6 +136,23 @@ A web-based platform jumping game that converts your photos into playable levels
 - Touch controls automatically appear
 - Start playing!
 
+## 🤖 Android Native App
+
+Photo Jumper can also be built as a native Android app using Capacitor:
+
+- Full-screen experience with native splash screen
+- Auto-triggers camera/gallery on launch
+- ML object detection loads automatically
+- Touch controls optimized for mobile
+
+**Quick install (requires Android SDK):**
+```bash
+npm run cap:sync
+cd android && ./gradlew installDebug
+```
+
+📖 **Full guide**: See [docs/ANDROID_SIDELOAD.md](docs/ANDROID_SIDELOAD.md) for step-by-step instructions including device setup, building, troubleshooting, and optional release signing.
+
 ## Install as App (PWA)
 
 Photo Jumper is a Progressive Web App (PWA) that can be installed on your device:
