@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ONNX Runtime Test - Photo Jumper</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        #status {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f0f0f0;
+        }
+        #status.loading { background: #fff3cd; color: #856404; }
+        #status.success { background: #d4edda; color: #155724; }
+        #status.error { background: #f8d7da; color: #721c24; }
+        #details {
+            margin-top: 20px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        #details p {
+            margin: 8px 0;
+            padding: 8px;
+            background: #f8f9fa;
+            border-left: 3px solid #dee2e6;
+        }
+        #details p.success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        #details p.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        #details p.info {
+            border-left-color: #17a2b8;
+            background: #d1ecf1;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 ONNX Runtime Test</h1>
+        <p>This page tests if ONNX Runtime Web can load and run the YOLOv8n model.</p>
+        
+        <div id="status" class="loading">Initializing test...</div>
+        <div id="details"></div>
+        
+        <button onclick="location.reload()">Run Test Again</button>
+        <button onclick="location.href='index.html'">Go to Photo Jumper</button>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const detailsEl = document.getElementById('details');
+
+        function log(message, type = 'info') {
+            const p = document.createElement('p');
+            p.className = type;
+            p.textContent = message;
+            detailsEl.appendChild(p);
+        }
+
+        async function testONNXRuntime() {
+            try {
+                log('🔍 Testing ONNX Runtime loading with fallback mechanism...', 'info');
+                
+                // Test both URLs like the real app does
+                const runtimeUrls = [
+                    'lib/ort.min.js',
+                    'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js'
+                ];
+                
+                let runtimeLoaded = false;
+                for (const url of runtimeUrls) {
+                    try {
+                        log(`Trying: ${url}`, 'info');
+                        statusEl.textContent = `Loading runtime from ${url.includes('://') ? 'CDN' : 'local'}...`;
+                        
+                        const script = document.createElement('script');
+                        script.src = url;
+                        
+                        await new Promise((resolve, reject) => {
+                            script.onload = () => resolve();
+                            script.onerror = () => reject(new Error('Failed to load'));
+                            document.head.appendChild(script);
+                        });
+                        
+                        // Wait for ort to be available
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        
+                        if (typeof ort !== 'undefined') {
+                            log(`✅ Runtime loaded from: ${url}`, 'success');
+                            
+                            // Configure WASM paths
+                            if (url.includes('://')) {
+                                const cdnBase = url.substring(0, url.lastIndexOf('/') + 1);
+                                ort.env.wasm.wasmPaths = cdnBase;
+                                log(`✅ WASM path set to: ${ort.env.wasm.wasmPaths}`, 'success');
+                            } else {
+                                ort.env.wasm.wasmPaths = 'lib/';
+                                log(`✅ WASM path set to: lib/`, 'success');
+                            }
+                            
+                            ort.env.wasm.numThreads = 1;
+                            runtimeLoaded = true;
+                            break;
+                        }
+                    } catch (err) {
+                        log(`❌ Failed: ${err.message}`, 'error');
+                    }
+                }
+                
+                if (!runtimeLoaded) {
+                    throw new Error('Failed to load ONNX Runtime from all sources');
+                }
+
+                // Try to load the model
+                statusEl.textContent = 'Loading YOLOv8n model...';
+                log('🔍 Testing model loading with fallback mechanism...', 'info');
+                
+                const modelUrls = [
+                    'models/yolov8n.onnx',
+                    'https://cdn.jsdelivr.net/gh/aspect-technology/yolov8-onnx@main/models/yolov8n.onnx'
+                ];
+
+                let session = null;
+                let loadedFrom = null;
+                
+                for (const url of modelUrls) {
+                    try {
+                        log(`Trying: ${url}`, 'info');
+                        session = await ort.InferenceSession.create(url, {
+                            executionProviders: ['wasm'],
+                            graphOptimizationLevel: 'all'
+                        });
+                        loadedFrom = url;
+                        break;
+                    } catch (err) {
+                        log(`❌ Failed: ${err.message}`, 'error');
+                    }
+                }
+
+                if (session) {
+                    statusEl.textContent = '✅ SUCCESS! ONNX is working correctly.';
+                    statusEl.className = 'success';
+                    log(`✅ Model loaded from: ${loadedFrom}`, 'success');
+                    log(`✅ Input: ${session.inputNames[0]}`, 'success');
+                    log(`✅ Outputs: ${session.outputNames.join(', ')}`, 'success');
+                    log('🎉 ML detection should work in Photo Jumper!', 'success');
+                } else {
+                    throw new Error('Failed to load model from all sources');
+                }
+
+            } catch (err) {
+                statusEl.textContent = `❌ ERROR: ${err.message}`;
+                statusEl.className = 'error';
+                log(`❌ Error: ${err.message}`, 'error');
+                log(`Stack: ${err.stack}`, 'error');
+                log('💡 Check browser console for more details', 'info');
+            }
+        }
+
+        // Run test automatically
+        testONNXRuntime();
+    </script>
+</body>
+</html>

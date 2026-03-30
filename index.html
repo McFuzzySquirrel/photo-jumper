@@ -3,7 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Photo Jumper - Platform Game</title>
+    <meta name="theme-color" content="#764ba2">
+    <meta name="description" content="Turn your photos into playable platformer levels! Upload a photo and jump through your own pictures.">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Photo Jumper">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png">
+    <!-- Android game app overrides -->
+    <link rel="stylesheet" href="css/android-game.css">
     <style>
         * {
             margin: 0;
@@ -139,7 +152,7 @@
             border: 3px solid #333;
             border-radius: 10px;
             max-width: 100%;
-            background: #87ceeb;
+            background: #1a1a2e;
             display: none;
         }
 
@@ -258,6 +271,415 @@
             color: #0b6b0b;
         }
 
+        /* Mobile control buttons */
+        .mobile-controls {
+            display: none;
+            justify-content: center;
+            gap: 12px;  /* Reduced from 25px since buttons are smaller */
+            margin-top: 15px;
+            user-select: none;
+        }
+
+        .mobile-controls.visible {
+            display: flex;
+        }
+
+        .control-btn {
+            width: 27.5px;  /* 50% smaller than 55px */
+            height: 27.5px;  /* 50% smaller than 55px */
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: 2px solid white;  /* Reduced border for smaller size */
+            border-radius: 8px;  /* Reduced border radius */
+            color: white;
+            font-size: 10px;  /* 50% smaller than 20px */
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);  /* Reduced shadow */
+            touch-action: none;
+            transition: transform 0.1s, box-shadow 0.1s, opacity 0.1s;
+            opacity: 0.5;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);  /* Reduced shadow */
+            opacity: 1.0;
+        }
+
+        .control-btn.jump-btn {
+            width: 35px;  /* 50% smaller than 70px */
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        /* Zoom control buttons */
+        .zoom-controls {
+            display: none;
+            position: fixed;
+            bottom: 90px;  /* Above mobile controls */
+            right: 20px;
+            flex-direction: row;  /* Horizontal layout */
+            gap: 5px;  /* Reduced from 10px since buttons are smaller */
+            z-index: 102;
+        }
+
+        .game-canvas-container.fullscreen ~ .zoom-controls {
+            display: flex;
+        }
+
+        .zoom-btn {
+            width: 25px;  /* 50% smaller than 50px */
+            height: 25px;  /* 50% smaller than 50px */
+            font-size: 12px;  /* 50% smaller than 24px */
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.5);  /* Reduced border */
+            border-radius: 4px;  /* Reduced border radius */
+            cursor: pointer;
+            transition: all 0.2s;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+        }
+
+        .zoom-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #FFD700;
+            transform: scale(1.1);
+        }
+
+        .zoom-btn:active {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0.95);
+        }
+
+        /* Game action buttons (R/G) in zoom group */
+        .zoom-btn.zoom-btn-action {
+            background: rgba(102, 126, 234, 0.9);
+            border-color: rgba(255, 255, 255, 0.9);
+            font-size: 8px;  /* 50% smaller than 16px */
+        }
+
+        .zoom-btn.zoom-btn-action:hover {
+            background: rgba(102, 126, 234, 1.0);
+            border-color: #FFD700;
+        }
+
+        /* Visual separator between game action buttons and zoom buttons */
+        /* Note: Vertical bar (1px wide × 15px tall) for horizontal button layout */
+        .zoom-btn-separator {
+            width: 1px;
+            height: 15px;  /* Reduced from 30px to match smaller buttons */
+            background: rgba(255, 255, 255, 0.3);
+            align-self: center;
+        }
+
+        /* Game logo styles */
+        .game-logo {
+            max-width: 200px;
+            border-radius: 16px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            margin-bottom: 16px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Splash screen styles */
+        .splash-screen {
+            text-align: center;
+            padding: 60px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+        }
+
+        .splash-screen.hidden {
+            display: none;
+        }
+
+        .splash-screen .game-logo {
+            max-width: 280px;
+            margin-bottom: 30px;
+            animation: splashPulse 2s ease-in-out infinite;
+        }
+
+        .splash-screen .splash-title {
+            font-size: 2.8em;
+            color: #333;
+            margin-bottom: 12px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .splash-screen .splash-subtitle {
+            font-size: 1.1em;
+            color: #888;
+            margin-bottom: 40px;
+        }
+
+        .splash-screen .splash-btn {
+            font-size: 1.4em;
+            padding: 18px 48px;
+            border-radius: 50px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 8px 30px rgba(240, 147, 251, 0.4);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .splash-screen .splash-btn:hover {
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 12px 40px rgba(240, 147, 251, 0.5);
+        }
+
+        @keyframes splashPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+
+        /* Intro screen styles */
+        .intro-screen {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .intro-screen.hidden {
+            display: none;
+        }
+
+        .intro-screen h1 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .intro-screen .tagline {
+            font-size: 1.3em;
+            color: #555;
+            margin-bottom: 30px;
+        }
+
+        .intro-screen .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+            text-align: left;
+        }
+
+        .intro-screen .feature {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .intro-screen .feature h3 {
+            margin-bottom: 8px;
+            color: #667eea;
+        }
+
+        .intro-screen .feature p {
+            color: #666;
+            margin: 0;
+        }
+
+        .intro-screen .cta-button {
+            font-size: 1.2em;
+            padding: 16px 32px;
+            margin-top: 20px;
+        }
+
+        /* Game screen styles */
+        .game-screen {
+            display: none;
+        }
+
+        .game-screen.active {
+            display: block;
+        }
+
+        /* Fullscreen styles */
+        .game-canvas-container.fullscreen {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* Frosted-glass background behind the game canvas */
+        .game-canvas-container.fullscreen::before {
+            content: '';
+            position: absolute;
+            inset: -20px;
+            background: url('images/photo-jumper-sq.png') center / cover no-repeat;
+            filter: blur(20px) brightness(0.3);
+            z-index: 0;
+            pointer-events: none; /* Prevent invisible layer from blocking interactions */
+        }
+
+        .game-canvas-container.fullscreen #gameCanvas {
+            width: 100vw;
+            height: 100vh;
+            border-radius: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Hide non-essential elements when canvas is fullscreen */
+        .game-canvas-container.fullscreen ~ .instructions {
+            display: none;
+        }
+
+        .game-screen:has(.game-canvas-container.fullscreen) .upload-section {
+            display: none;
+        }
+
+        .game-screen:has(.game-canvas-container.fullscreen) h1 {
+            display: none;
+        }
+
+        /* Word bar - positioned in letterbox area above canvas */
+        .word-bar {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 101;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 8px 15px;
+            border-radius: 6px;
+            border: 1px solid #FFD700;
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .word-label {
+            color: #FFF;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .word-letters {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .word-letter {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .word-letter.collected {
+            background: #FFD700;
+            color: #000;
+        }
+
+        .word-letter.uncollected {
+            background: #555;
+            color: #AAA;
+        }
+
+        .word-progress {
+            color: #FFD700;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* Detection mode indicator badge */
+        .detection-mode-badge {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 101;
+            background: rgba(0, 0, 0, 0.75);
+            color: #FFD700;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            display: none;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .detection-mode-badge.visible {
+            display: block;
+        }
+
+        .detection-mode-badge.ml-active {
+            background: rgba(102, 126, 234, 0.85);
+            color: white;
+            border-color: rgba(255, 255, 255, 0.6);
+        }
+
+        /* Position game info overlay when fullscreen */
+        .game-canvas-container.fullscreen ~ .game-info,
+        .game-screen:has(.game-canvas-container.fullscreen) .game-info {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 101;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Position mobile controls when fullscreen */
+        .game-canvas-container.fullscreen ~ .mobile-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 101;
+        }
+
+        /* Exit fullscreen button */
+        .exit-fullscreen-btn {
+            position: fixed;
+            top: 60px;  /* Moved down to not overlap score */
+            right: 10px;
+            z-index: 101;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            display: none;
+            cursor: pointer;
+        }
+
+        .exit-fullscreen-btn.visible {
+            display: block;
+        }
+        
+        .exit-fullscreen-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #FFD700;
+        }
+
+
         @media (max-width: 600px) {
             h1 {
                 font-size: 1.8em;
@@ -271,14 +693,57 @@
             .container {
                 padding: 20px;
             }
+
+            .intro-screen h1 {
+                font-size: 2em;
+            }
+
+            .intro-screen .tagline {
+                font-size: 1.1em;
+            }
         }
     </style>
 </head>
 <body>
+    <button class="exit-fullscreen-btn" id="exitFullscreenBtn">← Exit</button>
+    
     <div class="container">
-        <h1>🎮 Photo Jumper</h1>
-        
-        <div class="upload-section">
+        <!-- Splash Screen -->
+        <div class="splash-screen" id="splashScreen">
+            <img src="images/photo-jumper-sq.png" alt="Photo Jumper" class="game-logo">
+            
+            <p class="splash-subtitle">Turn your photos into playable levels</p>
+            <button class="splash-btn" id="splashPlayBtn">Let's Jump!</button>
+        </div>
+
+        <!-- Intro Screen -->
+        <div class="intro-screen hidden" id="introScreen">
+            <h1>Photo Jumper</h1>
+            <p class="tagline">Turn your photos into playable platformer levels!</p>
+            
+            <div class="features">
+                <div class="feature">
+                    <h3>📸 Upload or Capture</h3>
+                    <p>Use any photo - the game detects edges and brightness to create platforms</p>
+                </div>
+                <div class="feature">
+                    <h3>🎯 Reach the Goal</h3>
+                    <p>Jump from platform to platform to reach the golden portal</p>
+                </div>
+                <div class="feature">
+                    <h3>⚡ Fast & Fun</h3>
+                    <p>Quick platformer action with responsive controls</p>
+                </div>
+            </div>
+
+            <button class="cta-button" id="startGameBtn">Get Started</button>
+        </div>
+
+        <!-- Game Screen -->
+        <div class="game-screen" id="gameScreen">
+            <h1>Photo Jumper</h1>
+            
+            <div class="upload-section">
             <div class="button-group">
                 <button id="uploadBtn">📁 Upload Photo</button>
                 <button id="cameraBtn">📷 Take Photo</button>
@@ -305,20 +770,73 @@
             Score: <span id="score">0</span> | Time: <span id="time">0</span>s
         </div>
 
+        <!-- Word collection bar - positioned above canvas in letterbox area -->
+        <div class="word-bar" id="wordBar" style="display: none;">
+            <span class="word-label">Word:</span>
+            <span class="word-letters" id="wordLetters"></span>
+            <span class="word-progress" id="wordProgress"></span>
+        </div>
+
+        <!-- Detection mode indicator badge -->
+        <div class="detection-mode-badge" id="detectionModeBadge">Grid Only</div>
+
         <div class="game-canvas-container">
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <canvas id="previewCanvas" class="preview-canvas"></canvas>
         </div>
 
+        <!-- Mobile control buttons — thumb-zone layout for native app -->
+        <div class="mobile-controls" id="mobileControls">
+            <div class="movement-group">
+                <button class="control-btn" id="leftBtn" aria-label="Move left">◀</button>
+                <button class="control-btn" id="rightBtn" aria-label="Move right">▶</button>
+            </div>
+            <div class="action-group">
+                <button class="control-btn action-btn" id="respawnBtnMobile" aria-label="Respawn">R</button>
+                <button class="control-btn jump-btn" id="jumpBtn" aria-label="Jump">▲</button>
+            </div>
+        </div>
+
+        <!-- Zoom & game action control buttons -->
+        <div class="zoom-controls" id="zoomControls">
+            <button class="zoom-btn zoom-btn-action" id="regenBtn" aria-label="Regenerate level" title="Regenerate level (G)">G</button>
+            <button class="zoom-btn zoom-btn-action" id="respawnBtn" aria-label="Respawn" title="Respawn (R)">R</button>
+            <div class="zoom-btn-separator"></div>
+            <button class="zoom-btn" id="zoomOutBtn" aria-label="Zoom out" title="Zoom out (-)">−</button>
+            <button class="zoom-btn" id="zoomResetBtn" aria-label="Reset zoom" title="Reset zoom (0)">⊙</button>
+            <button class="zoom-btn" id="zoomInBtn" aria-label="Zoom in" title="Zoom in (+)">+</button>
+        </div>
+
         <div class="instructions">
             <h3>How to Play:</h3>
             <p>1. Upload a photo or take one with your camera</p>
-            <p>2. The photo will be converted into platforms based on brightness</p>
+            <p>2. The photo will be converted into block platforms</p>
             <p>3. Use <strong>Arrow Keys</strong> or <strong>WASD</strong> to move (or touch controls on mobile)</p>
-            <p>4. Press <strong>Space</strong> or <strong>Up Arrow</strong> to jump</p>
-            <p>5. Navigate from the green start platform to the golden goal star!</p>
-            <p>6. Press <strong>R</strong> to respawn if you get stuck</p>
+            <p>4. Press <strong>Space</strong>, <strong>Up</strong>, or <strong>W</strong> to jump</p>
+            <p>5. Collect golden letters to spell words for bonus points</p>
+            <p>6. Walk into the glowing <strong>golden portal</strong> to win!</p>
+            <p>7. Press <strong>R</strong> to respawn, <strong>G</strong> to regenerate level</p>
+            <p><label><input type="checkbox" id="debugOverlayToggle"> Debug overlay (shows platform grid)</label></p>
+            <p>
+                <label><input type="checkbox" id="mlDetectionToggle" aria-describedby="mlStatusDesc"> ML object detection (experimental)</label>
+                <span id="mlStatus" style="font-size: 12px; color: #666;"></span>
+                <span id="mlStatusDesc" class="visually-hidden" style="position: absolute; left: -10000px;">When enabled, uses machine learning to detect objects in your photo and create platforms from them. May increase loading time.</span>
+            </p>
+            <p style="margin-left: 20px;">
+                <label><input type="checkbox" id="mlOnlyModeToggle" disabled> ML-only mode (no grid platforms)</label>
+                <span style="font-size: 11px; color: #888; display: block; margin-left: 20px; margin-top: 4px;">
+                    Requires ML detection enabled. Uses only ML platforms + fallback chain.
+                </span>
+            </p>
+            <p style="font-size: 11px; color: #888; margin-top: 5px; margin-left: 20px;">
+                💡 <strong>Tip:</strong> Use <strong>Grid only</strong> for landscapes/buildings. Use <strong>ML detection</strong> for furniture, vehicles, and objects.
+            </p>
+            <p style="font-size: 12px; color: #666; margin-top: 15px;">
+                🔒 <strong>Privacy:</strong> All photos are processed entirely in your browser. No images are uploaded, stored, or transmitted to any server.
+            </p>
         </div>
+        </div>
+        <!-- End Game Screen -->
 
         <div id="feedbackModal" class="modal" aria-hidden="true">
             <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
@@ -349,855 +867,42 @@
                 </form>
             </div>
         </div>
+
+        <!-- Pause button (visible in native app mode) -->
+        <button class="pause-btn" id="pauseBtn" aria-label="Pause game">⏸</button>
+
+        <!-- Pause menu overlay -->
+        <div class="pause-overlay" id="pauseOverlay">
+            <h2>Paused</h2>
+            <button class="pause-menu-btn primary" id="resumeBtn">▶ Resume</button>
+            <button class="pause-menu-btn secondary" id="restartLevelBtn">🔄 Restart Level</button>
+            <button class="pause-menu-btn secondary" id="newPhotoBtn">📷 New Photo</button>
+            <button class="pause-menu-btn secondary" id="mainMenuBtn">🏠 Main Menu</button>
+        </div>
+
+        <!-- Victory screen overlay -->
+        <div class="victory-overlay" id="victoryOverlay">
+            <h2>🎉 Level Complete!</h2>
+            <div class="victory-stats" id="victoryStats">
+                <div>Score: <span class="stat-value" id="victoryScore">0</span></div>
+                <div>Time: <span class="stat-value" id="victoryTime">0</span>s</div>
+                <div>Word: <span class="stat-value" id="victoryWord">—</span></div>
+            </div>
+            <button class="pause-menu-btn primary" id="playAgainBtn">🔄 Play Again</button>
+            <button class="pause-menu-btn secondary" id="victoryNewPhotoBtn">📷 New Photo</button>
+            <button class="pause-menu-btn secondary" id="victoryMainMenuBtn">🏠 Main Menu</button>
+        </div>
+
+        <!-- ML loading overlay -->
+        <div class="ml-loading-overlay" id="mlLoadingOverlay">
+            <div class="loading-title">🤖 Detecting Objects...</div>
+            <div class="loading-bar-track">
+                <div class="loading-bar-fill" id="mlLoadingBar"></div>
+            </div>
+            <div class="loading-tip" id="mlLoadingTip">Analyzing your photo with AI to create platforms</div>
+        </div>
     </div>
 
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const previewCanvas = document.getElementById('previewCanvas');
-        const previewCtx = previewCanvas.getContext('2d');
-        
-        const uploadBtn = document.getElementById('uploadBtn');
-        const cameraBtn = document.getElementById('cameraBtn');
-        const resetBtn = document.getElementById('resetBtn');
-        const feedbackBtn = document.getElementById('feedbackBtn');
-        const fileInput = document.getElementById('fileInput');
-        const cameraInput = document.getElementById('cameraInput');
-        const gameInfo = document.getElementById('gameInfo');
-        const scoreElement = document.getElementById('score');
-        const timeElement = document.getElementById('time');
-
-        const feedbackModal = document.getElementById('feedbackModal');
-        const feedbackForm = document.getElementById('feedbackForm');
-        const feedbackDeviceType = document.getElementById('feedbackDeviceType');
-        const feedbackMessage = document.getElementById('feedbackMessage');
-        const feedbackCancelBtn = document.getElementById('feedbackCancelBtn');
-        const feedbackSubmitBtn = document.getElementById('feedbackSubmitBtn');
-        const feedbackStatus = document.getElementById('feedbackStatus');
-
-        const lanHint = document.getElementById('lanHint');
-        const lanUrl = document.getElementById('lanUrl');
-        const lanNote = document.getElementById('lanNote');
-        const copyLinkBtn = document.getElementById('copyLinkBtn');
-
-        const FEEDBACK_TOKEN_STORAGE_KEY = 'photoJumperFeedbackToken';
-
-        // Game configuration constants
-        const GRID_SIZE = 30;  // 1.5x player size (20px) for minimum jumping gaps
-        const BRIGHTNESS_THRESHOLD = 128;
-        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-        const EDGE_DETECTION_THRESHOLD = 40;  // Brightness difference for edge detection
-        const EDGE_BRIGHTNESS_THRESHOLD = 180;  // Max brightness for edge-detected platforms
-        
-        // Player spawn and reserved area constants
-        const PLAYER_SPAWN_X = 40;
-        const PLAYER_SPAWN_Y_OFFSET = 100; // Pixels above canvas bottom
-        const START_AREA_WIDTH = 140;  // Wider to ensure clear start area
-        const START_AREA_HEIGHT = 100;  // Taller to ensure clear start area
-        const GOAL_AREA_WIDTH = 100;
-        const GOAL_AREA_HEIGHT = 80;
-        
-        // Stuck detection constants
-        const STUCK_CHECK_INTERVAL = 3000;  // 3 seconds
-        const STUCK_MOVEMENT_THRESHOLD = 5;  // pixels
-
-        let gameRunning = false;
-        let platforms = [];
-        let player = null;
-        let goal = null;  // Goal/end point for the level
-        let playerSpawnY = 0;  // Calculated spawn Y position
-        let keys = {};
-        let score = 0;
-        let startTime = 0;
-        let touchStartX = 0;
-        let touchStartY = 0;
-        let touchJumping = false;
-        let backgroundImage = null; // Store the uploaded photo for background
-        let gameWon = false;  // Track if player reached the goal
-
-        // Player class
-        class Player {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.width = 20;  // Reduced from 30 to fit better in spaces
-                this.height = 20; // Reduced from 30 to fit better in spaces
-                this.velocityX = 0;
-                this.velocityY = 0;
-                this.speed = 5;
-                this.jumpPower = 12;
-                this.gravity = 0.5;
-                this.onGround = false;
-                this.lastPositionTime = Date.now();
-                this.lastX = x;
-                this.lastY = y;
-                this.stuckCheckInterval = STUCK_CHECK_INTERVAL;
-            }
-
-            update() {
-                // Horizontal movement
-                if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
-                    this.velocityX = -this.speed;
-                } else if (keys['ArrowRight'] || keys['d'] || keys['D']) {
-                    this.velocityX = this.speed;
-                } else {
-                    this.velocityX *= 0.8; // Friction
-                }
-
-                // Jumping
-                if ((keys['ArrowUp'] || keys['w'] || keys['W'] || keys[' '] || touchJumping) && this.onGround) {
-                    this.velocityY = -this.jumpPower;
-                    this.onGround = false;
-                    touchJumping = false; // Reset touch jump
-                }
-
-                // Apply gravity
-                this.velocityY += this.gravity;
-
-                // Update horizontal position
-                this.x += this.velocityX;
-
-                // Check horizontal platform collisions
-                for (let platform of platforms) {
-                    if (this.checkCollision(platform)) {
-                        // Push out from sides
-                        if (this.x + this.width / 2 < platform.x + platform.width / 2) {
-                            this.x = platform.x - this.width;
-                        } else {
-                            this.x = platform.x + platform.width;
-                        }
-                        this.velocityX = 0;
-                    }
-                }
-
-                // Update vertical position
-                this.y += this.velocityY;
-
-                // Check vertical platform collisions
-                this.onGround = false;
-                for (let platform of platforms) {
-                    if (this.checkCollision(platform)) {
-                        // Landing on top of platform
-                        if (this.velocityY > 0 && this.y + this.height - this.velocityY <= platform.y) {
-                            this.y = platform.y - this.height;
-                            this.velocityY = 0;
-                            this.onGround = true;
-                        }
-                        // Hitting platform from below
-                        else if (this.velocityY < 0 && this.y - this.velocityY >= platform.y + platform.height) {
-                            this.y = platform.y + platform.height;
-                            this.velocityY = 0;
-                        }
-                    }
-                }
-
-                // Boundary checks
-                if (this.x < 0) this.x = 0;
-                if (this.x + this.width > canvas.width) this.x = canvas.width - this.width;
-
-                // Check if player fell off
-                if (this.y > canvas.height) {
-                    this.respawn();
-                }
-
-                // Stuck detection: if player hasn't moved significantly in a while
-                const now = Date.now();
-                const distMoved = Math.sqrt((this.x - this.lastX) ** 2 + (this.y - this.lastY) ** 2);
-                
-                if (now - this.lastPositionTime > this.stuckCheckInterval) {
-                    if (distMoved < STUCK_MOVEMENT_THRESHOLD && this.onGround) {
-                        // Player appears stuck, auto-respawn
-                        this.respawn();
-                        // Reset tracking variables after respawn to prevent immediate re-triggering
-                        this.lastX = this.x;
-                        this.lastY = this.y;
-                        this.lastPositionTime = Date.now();
-                    } else {
-                        // Update last known position when not stuck
-                        this.lastX = this.x;
-                        this.lastY = this.y;
-                        this.lastPositionTime = now;
-                    }
-                }
-
-                // Update score based on highest position reached
-                const currentScore = Math.max(0, Math.floor((canvas.height - this.y) / 10));
-                if (currentScore > score) {
-                    score = currentScore;
-                    scoreElement.textContent = score;
-                }
-            }
-
-            checkCollision(platform) {
-                return this.x < platform.x + platform.width &&
-                       this.x + this.width > platform.x &&
-                       this.y < platform.y + platform.height &&
-                       this.y + this.height > platform.y;
-            }
-
-            respawn() {
-                this.x = PLAYER_SPAWN_X;
-                this.y = playerSpawnY;  // Use the calculated spawn Y position
-                this.velocityX = 0;
-                this.velocityY = 0;
-                score = Math.max(0, score - 10);
-                scoreElement.textContent = score;
-            }
-
-            draw() {
-                // Draw shadow/outline for better visibility on photo
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                ctx.fillRect(this.x + 2, this.y + 2, this.width, this.height);
-                
-                // Draw main body
-                ctx.fillStyle = '#ff4444';
-                ctx.fillRect(this.x, this.y, this.width, this.height);
-                
-                // Draw border for visibility
-                ctx.strokeStyle = '#000';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(this.x, this.y, this.width, this.height);
-                
-                // Draw eyes (adjusted for smaller size)
-                ctx.fillStyle = 'white';
-                ctx.fillRect(this.x + 4, this.y + 5, 4, 4);
-                ctx.fillRect(this.x + 12, this.y + 5, 4, 4);
-                
-                ctx.fillStyle = 'black';
-                ctx.fillRect(this.x + 5, this.y + 6, 2, 2);
-                ctx.fillRect(this.x + 13, this.y + 6, 2, 2);
-            }
-        }
-
-        // Goal class - represents the end goal for the level
-        class Goal {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.width = 30;
-                this.height = 30;
-                this.animation = 0;
-            }
-
-            update() {
-                this.animation += 0.1;
-            }
-
-            checkCollision(player) {
-                return player.x < this.x + this.width &&
-                       player.x + player.width > this.x &&
-                       player.y < this.y + this.height &&
-                       player.y + player.height > this.y;
-            }
-
-            draw() {
-                // Draw animated star/goal
-                const centerX = this.x + this.width / 2;
-                const centerY = this.y + this.height / 2;
-                const outerRadius = 15 + Math.sin(this.animation) * 2;
-                const innerRadius = 7;
-                
-                ctx.save();
-                ctx.translate(centerX, centerY);
-                ctx.rotate(this.animation * 0.5);
-                
-                // Draw star
-                ctx.beginPath();
-                for (let i = 0; i < 5; i++) {
-                    const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
-                    const radius = i % 2 === 0 ? outerRadius : innerRadius;
-                    const x = Math.cos(angle) * radius;
-                    const y = Math.sin(angle) * radius;
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.closePath();
-                
-                // Gradient fill
-                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, outerRadius);
-                gradient.addColorStop(0, '#FFD700');
-                gradient.addColorStop(1, '#FFA500');
-                ctx.fillStyle = gradient;
-                ctx.fill();
-                
-                ctx.strokeStyle = '#FF8C00';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                ctx.restore();
-            }
-        }
-
-        // Platform class
-        class Platform {
-            constructor(x, y, width, height, color) {
-                this.x = x;
-                this.y = y;
-                this.width = width;
-                this.height = height;
-                this.color = color;
-            }
-
-            draw() {
-                ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.width, this.height);
-                ctx.strokeStyle = '#000';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(this.x, this.y, this.width, this.height);
-            }
-        }
-
-        // Process image and create platforms
-        function processImage(image) {
-            // Store the image for background rendering
-            backgroundImage = image;
-
-            // Set canvas size based on image aspect ratio
-            const maxWidth = 800;
-            const maxHeight = 600;
-            let width = image.width;
-            let height = image.height;
-
-            if (width > maxWidth) {
-                height = (height * maxWidth) / width;
-                width = maxWidth;
-            }
-            if (height > maxHeight) {
-                width = (width * maxHeight) / height;
-                height = maxHeight;
-            }
-
-            canvas.width = width;
-            canvas.height = height;
-            previewCanvas.width = width;
-            previewCanvas.height = height;
-
-            // Draw image to preview canvas
-            previewCtx.drawImage(image, 0, 0, width, height);
-            const imageData = previewCtx.getImageData(0, 0, width, height);
-            const data = imageData.data;
-
-            // Create platforms based on brightness and edge detection
-            platforms = [];
-            const gridSize = GRID_SIZE;
-            const brightnessThreshold = BRIGHTNESS_THRESHOLD;
-
-            // Helper function to detect edges (helps identify objects better)
-            function hasEdge(x, y, width, height, data) {
-                // Allow edge detection near boundaries, just need 1-pixel neighbors
-                if (x === 0 || y === 0 || x + 1 >= width || y + 1 >= height) {
-                    return false;
-                }
-                
-                // Get center brightness
-                const centerI = (y * width + x) * 4;
-                const centerBrightness = (data[centerI] + data[centerI + 1] + data[centerI + 2]) / 3;
-                
-                // Check brightness difference with adjacent neighbors (1 pixel away)
-                let maxDiff = 0;
-                const checkPositions = [
-                    [x - 1, y], [x + 1, y],
-                    [x, y - 1], [x, y + 1]
-                ];
-                
-                for (const [px, py] of checkPositions) {
-                    if (px >= 0 && px < width && py >= 0 && py < height) {
-                        const i = (py * width + px) * 4;
-                        const neighborBrightness = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                        const diff = Math.abs(centerBrightness - neighborBrightness);
-                        maxDiff = Math.max(maxDiff, diff);
-                    }
-                }
-                // Significant brightness difference indicates an edge
-                return maxDiff > EDGE_DETECTION_THRESHOLD;
-            }
-
-            for (let y = 0; y < height; y += gridSize) {
-                for (let x = 0; x < width; x += gridSize) {
-                    let totalBrightness = 0;
-                    let pixelCount = 0;
-
-                    // Calculate average brightness of grid cell
-                    for (let dy = 0; dy < gridSize && y + dy < height; dy++) {
-                        for (let dx = 0; dx < gridSize && x + dx < width; dx++) {
-                            const i = ((y + dy) * width + (x + dx)) * 4;
-                            const r = data[i];
-                            const g = data[i + 1];
-                            const b = data[i + 2];
-                            const brightness = (r + g + b) / 3;
-                            totalBrightness += brightness;
-                            pixelCount++;
-                        }
-                    }
-
-                    const avgBrightness = totalBrightness / pixelCount;
-
-                    // Create platform if brightness is below threshold OR at edges (better object detection)
-                    const isEdge = hasEdge(x, y, width, height, data);
-                    
-                    // Reserve start area (bottom-left) and goal area (top-right) - don't generate platforms there
-                    const isStartArea = (x < START_AREA_WIDTH && y > height - START_AREA_HEIGHT);
-                    const isGoalArea = (x > width - GOAL_AREA_WIDTH && y < GOAL_AREA_HEIGHT);
-                    
-                    if (!isStartArea && !isGoalArea && (avgBrightness < brightnessThreshold || (isEdge && avgBrightness < EDGE_BRIGHTNESS_THRESHOLD))) {
-                        const platformWidth = Math.min(gridSize, width - x);
-                        const platformHeight = Math.min(gridSize, height - y);
-                        
-                        // Ensure minimum platform size for better navigability
-                        if (platformWidth >= gridSize && platformHeight >= gridSize) {
-                            // Use darker, more opaque color for better visibility
-                            const alpha = 0.7; // Increased from 0.4 to 0.7 for better visibility
-                            const colorValue = Math.floor(avgBrightness * 0.6); // Darker shade
-                            const color = `rgba(${colorValue}, ${colorValue}, ${colorValue}, ${alpha})`;
-                            
-                            platforms.push(new Platform(x, y, platformWidth, platformHeight, color));
-                        }
-                    }
-                }
-            }
-
-            // Add a ground platform at the bottom (darker and more opaque)
-            platforms.push(new Platform(0, height - 20, width, 20, 'rgba(100, 60, 20, 0.8)'));
-
-            // Add starting platform (green to indicate start, larger and clearer)
-            const startPlatformY = height - 60;
-            platforms.push(new Platform(10, startPlatformY, 100, 20, 'rgba(0, 180, 0, 0.9)'));
-
-            // Add goal at top-right corner of the level
-            const goalX = width - 50;
-            const goalY = 20;
-            // Add a platform for the goal to sit on (golden and more visible)
-            platforms.push(new Platform(goalX - 10, goalY + 30, 50, 20, 'rgba(255, 200, 0, 0.9)'));
-            goal = new Goal(goalX, goalY);
-
-            // Initialize player ON the start platform (not above it)
-            playerSpawnY = startPlatformY - 20; // Player height is 20, so spawn on top of platform
-            player = new Player(PLAYER_SPAWN_X, playerSpawnY);
-            
-            // Remove any photo-generated platforms that overlap with player spawn area
-            // to ensure player never spawns inside a block
-            const spawnCheckX = PLAYER_SPAWN_X - 10;
-            const spawnCheckY = playerSpawnY - 10;
-            const spawnCheckWidth = 40;  // Player width + buffer
-            const spawnCheckHeight = 40; // Player height + buffer
-            
-            platforms = platforms.filter(platform => {
-                // Keep special platforms (ground, start, goal)
-                if (platform.color.includes('100, 60, 20') || // ground
-                    platform.color.includes('0, 180, 0') ||   // start
-                    platform.color.includes('255, 200, 0')) { // goal
-                    return true;
-                }
-                // Remove platforms that overlap with spawn area
-                const overlaps = !(platform.x + platform.width < spawnCheckX ||
-                                 platform.x > spawnCheckX + spawnCheckWidth ||
-                                 platform.y + platform.height < spawnCheckY ||
-                                 platform.y > spawnCheckY + spawnCheckHeight);
-                return !overlaps;
-            });
-
-            // Start game
-            startGame();
-        }
-
-        // Start the game loop
-        function startGame() {
-            gameRunning = true;
-            gameWon = false;  // Reset win state
-            canvas.style.display = 'block';
-            gameInfo.style.display = 'block';
-            resetBtn.style.display = 'inline-block';
-            uploadBtn.style.display = 'none';
-            cameraBtn.style.display = 'none';
-            
-            score = 0;
-            startTime = Date.now();
-            scoreElement.textContent = score;
-            
-            gameLoop();
-        }
-
-        // Main game loop
-        function gameLoop() {
-            if (!gameRunning) return;
-
-            // Draw the photo as background instead of solid color
-            if (backgroundImage) {
-                ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
-            } else {
-                // Fallback to sky blue if no image
-                ctx.fillStyle = '#87ceeb';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-            }
-
-            // Update and draw goal
-            if (goal) {
-                goal.update();
-                goal.draw();
-            }
-
-            // Update and draw platforms
-            for (let platform of platforms) {
-                platform.draw();
-            }
-
-            // Update and draw player
-            if (player && !gameWon) {
-                player.update();
-                player.draw();
-                
-                // Check if player reached the goal
-                if (goal && goal.checkCollision(player)) {
-                    gameWon = true;
-                }
-            } else if (player && gameWon) {
-                // Just draw the player when game is won, don't update
-                player.draw();
-            }
-
-            // Draw win message if game is won
-            if (gameWon) {
-                drawWinMessage();
-            }
-
-            // Update time
-            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-            timeElement.textContent = elapsedTime;
-
-            requestAnimationFrame(gameLoop);
-        }
-
-        // Draw win message overlay
-        function drawWinMessage() {
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-            ctx.fillRect(0, canvas.height / 2 - 50, canvas.width, 100);
-            ctx.fillStyle = '#FFD700';
-            ctx.font = 'bold 36px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('🎉 YOU WIN! 🎉', canvas.width / 2, canvas.height / 2);
-            ctx.font = '20px Arial';
-            ctx.fillStyle = '#FFF';
-            ctx.fillText(`Time: ${Math.floor((Date.now() - startTime) / 1000)}s`, canvas.width / 2, canvas.height / 2 + 30);
-        }
-
-        // Reset game
-        function resetGame() {
-            gameRunning = false;
-            gameWon = false;
-            platforms = [];
-            player = null;
-            goal = null;  // Clear goal
-            score = 0;
-            backgroundImage = null; // Clear background image
-            canvas.style.display = 'none';
-            gameInfo.style.display = 'none';
-            resetBtn.style.display = 'none';
-            uploadBtn.style.display = 'inline-block';
-            cameraBtn.style.display = 'inline-block';
-        }
-
-        function guessDeviceType() {
-            const ua = (navigator.userAgent || '').toLowerCase();
-            if (ua.includes('ipad') || ua.includes('tablet')) return 'tablet';
-            if (ua.includes('iphone') || ua.includes('android')) {
-                return ua.includes('mobile') ? 'mobile' : 'tablet';
-            }
-            if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
-                return window.innerWidth >= 768 ? 'tablet' : 'mobile';
-            }
-            return 'desktop';
-        }
-
-        function setFeedbackStatus(text, kind) {
-            feedbackStatus.textContent = text || '';
-            feedbackStatus.classList.remove('error', 'success');
-            if (kind) feedbackStatus.classList.add(kind);
-        }
-
-        function openFeedbackModal() {
-            feedbackDeviceType.value = guessDeviceType();
-            setFeedbackStatus('', null);
-            feedbackModal.classList.add('open');
-            feedbackModal.setAttribute('aria-hidden', 'false');
-
-            if (location.protocol === 'file:') {
-                setFeedbackStatus('Feedback requires running the local server (not file://).', 'error');
-            }
-
-            setTimeout(() => {
-                feedbackMessage.focus();
-            }, 0);
-        }
-
-        function closeFeedbackModal() {
-            feedbackModal.classList.remove('open');
-            feedbackModal.setAttribute('aria-hidden', 'true');
-        }
-
-        async function postFeedback(message, deviceType, token) {
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            if (token) headers['X-Feedback-Token'] = token;
-
-            return fetch('/api/feedback', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
-                    message,
-                    deviceType
-                })
-            });
-        }
-
-        function shouldIgnoreGameKeyEvent(e) {
-            if (feedbackModal.classList.contains('open')) return true;
-            const target = e.target;
-            if (!target) return false;
-            if (target.isContentEditable) return true;
-            const tag = (target.tagName || '').toUpperCase();
-            return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-        }
-
-        function updateLanHint() {
-            if (location.protocol === 'file:') {
-                lanHint.classList.remove('open');
-                return;
-            }
-
-            lanHint.classList.add('open');
-            lanUrl.textContent = location.href;
-
-            const host = (location.hostname || '').toLowerCase();
-            if (host === 'localhost' || host === '127.0.0.1') {
-                lanNote.innerHTML = 'If you\'re sharing to other devices, replace <strong>localhost</strong> with the host computer\'s LAN IP (e.g. <strong>192.168.x.x</strong>).';
-            } else if (host === '0.0.0.0') {
-                lanNote.innerHTML = 'Use the host computer\'s LAN IP instead of <strong>0.0.0.0</strong> when sharing (e.g. <strong>192.168.x.x</strong>).';
-            } else {
-                lanNote.textContent = 'Open this URL on devices connected to the same network.';
-            }
-        }
-
-        async function copyLanLink() {
-            const text = location.href;
-            try {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    await navigator.clipboard.writeText(text);
-                } else {
-                    const temp = document.createElement('textarea');
-                    temp.value = text;
-                    temp.style.position = 'fixed';
-                    temp.style.left = '-9999px';
-                    document.body.appendChild(temp);
-                    temp.focus();
-                    temp.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(temp);
-                }
-                copyLinkBtn.textContent = 'Copied';
-                setTimeout(() => {
-                    copyLinkBtn.textContent = 'Copy';
-                }, 900);
-            } catch {
-                copyLinkBtn.textContent = 'Copy failed';
-                setTimeout(() => {
-                    copyLinkBtn.textContent = 'Copy';
-                }, 1200);
-            }
-        }
-
-        // Event listeners
-        uploadBtn.addEventListener('click', () => fileInput.click());
-        cameraBtn.addEventListener('click', () => cameraInput.click());
-        resetBtn.addEventListener('click', resetGame);
-
-        copyLinkBtn.addEventListener('click', copyLanLink);
-
-        feedbackBtn.addEventListener('click', openFeedbackModal);
-        feedbackCancelBtn.addEventListener('click', closeFeedbackModal);
-        feedbackModal.addEventListener('click', (e) => {
-            if (e.target === feedbackModal) closeFeedbackModal();
-        });
-
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                // Validate file type
-                if (!file.type.match('image.*')) {
-                    alert('Please select a valid image file.');
-                    return;
-                }
-                
-                // Validate file size
-                if (file.size > MAX_FILE_SIZE) {
-                    alert('File is too large. Please select an image under 10MB.');
-                    return;
-                }
-                
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.onload = () => processImage(img);
-                    img.onerror = () => {
-                        alert('Failed to load image. Please try a different file.');
-                    };
-                    img.src = event.target.result;
-                };
-                reader.onerror = () => {
-                    alert('Failed to read file. Please try again.');
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        cameraInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                // Validate file type
-                if (!file.type.match('image.*')) {
-                    alert('Please capture a valid image.');
-                    return;
-                }
-                
-                // Validate file size
-                if (file.size > MAX_FILE_SIZE) {
-                    alert('Image is too large. Please try again.');
-                    return;
-                }
-                
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.onload = () => processImage(img);
-                    img.onerror = () => {
-                        alert('Failed to load image. Please try again.');
-                    };
-                    img.src = event.target.result;
-                };
-                reader.onerror = () => {
-                    alert('Failed to read image. Please try again.');
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        feedbackForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const message = (feedbackMessage.value || '').trim();
-            const deviceType = feedbackDeviceType.value || 'unknown';
-
-            if (!message) {
-                setFeedbackStatus('Please enter a message.', 'error');
-                return;
-            }
-
-            feedbackSubmitBtn.disabled = true;
-            setFeedbackStatus('Sending…', null);
-
-            try {
-                let token = localStorage.getItem(FEEDBACK_TOKEN_STORAGE_KEY) || '';
-                let response = await postFeedback(message, deviceType, token);
-
-                if (response.status === 401) {
-                    const enteredToken = window.prompt('This server requires an access code. Enter it to send feedback:');
-                    if (enteredToken) {
-                        localStorage.setItem(FEEDBACK_TOKEN_STORAGE_KEY, enteredToken);
-                        token = enteredToken;
-                        response = await postFeedback(message, deviceType, token);
-                    }
-                }
-
-                if (!response.ok) {
-                    const text = await response.text();
-                    setFeedbackStatus(`Failed to send feedback (${response.status}). ${text ? 'Details: ' + text : ''}`.trim(), 'error');
-                    return;
-                }
-
-                feedbackMessage.value = '';
-                setFeedbackStatus('Sent. Thank you!', 'success');
-
-                setTimeout(() => {
-                    closeFeedbackModal();
-                }, 700);
-            } catch (err) {
-                setFeedbackStatus('Failed to send feedback. Is the local server running?', 'error');
-            } finally {
-                feedbackSubmitBtn.disabled = false;
-            }
-        });
-
-        updateLanHint();
-
-        // Keyboard controls
-        document.addEventListener('keydown', (e) => {
-            if (shouldIgnoreGameKeyEvent(e)) return;
-            
-            // Manual respawn with 'R' key
-            if ((e.key === 'r' || e.key === 'R') && player && gameRunning) {
-                player.respawn();
-                e.preventDefault();
-                return;
-            }
-            
-            keys[e.key] = true;
-            // Prevent default for arrow keys and space
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
-                e.preventDefault();
-            }
-        });
-
-        document.addEventListener('keyup', (e) => {
-            if (shouldIgnoreGameKeyEvent(e)) return;
-            keys[e.key] = false;
-        });
-
-        // Touch controls for mobile
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const rect = canvas.getBoundingClientRect();
-            touchStartX = touch.clientX - rect.left;
-            touchStartY = touch.clientY - rect.top;
-            
-            // Jump on tap
-            touchJumping = true;
-        });
-
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const rect = canvas.getBoundingClientRect();
-            const touchX = touch.clientX - rect.left;
-            const touchY = touch.clientY - rect.top;
-            
-            // Horizontal movement based on touch position
-            const deltaX = touchX - touchStartX;
-            
-            if (deltaX < -20) {
-                keys['ArrowLeft'] = true;
-                keys['ArrowRight'] = false;
-            } else if (deltaX > 20) {
-                keys['ArrowRight'] = true;
-                keys['ArrowLeft'] = false;
-            } else {
-                keys['ArrowLeft'] = false;
-                keys['ArrowRight'] = false;
-            }
-        });
-
-        canvas.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            touchJumping = false;
-            keys['ArrowLeft'] = false;
-            keys['ArrowRight'] = false;
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && feedbackModal.classList.contains('open')) {
-                closeFeedbackModal();
-            }
-        });
-    </script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>

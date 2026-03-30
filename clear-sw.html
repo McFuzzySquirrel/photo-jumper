@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Service Worker - Photo Jumper</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #667eea;
+            margin-top: 0;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #764ba2;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .instructions {
+            background: #f8f9fa;
+            padding: 15px;
+            border-left: 4px solid #667eea;
+            margin: 20px 0;
+        }
+        .instructions ol {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Service Worker Reset</h1>
+        <p>This page will help you clear the old service worker and cache so the ONNX fix can work properly.</p>
+
+        <div class="instructions">
+            <strong>Why do I need this?</strong>
+            <ol>
+                <li>The old service worker is cached in your browser</li>
+                <li>It's blocking the ONNX Runtime from loading</li>
+                <li>We need to clear it and reload the new one</li>
+            </ol>
+        </div>
+
+        <div id="status" class="status info">Click the button below to reset everything...</div>
+
+        <button onclick="clearEverything()">🗑️ Clear Service Worker & Cache</button>
+        <button onclick="window.location.href='test-onnx.html'">🧪 Test ONNX</button>
+        <button onclick="window.location.href='index.html'">🏠 Go to App</button>
+
+        <div class="instructions" style="margin-top: 30px;">
+            <strong>Manual steps (if button doesn't work):</strong>
+            <ol>
+                <li>Press <kbd>F12</kbd> to open DevTools</li>
+                <li>Go to "Application" tab</li>
+                <li>Click "Service Workers" on left</li>
+                <li>Click "Unregister" next to photo-jumper</li>
+                <li>Click "Clear storage" on left</li>
+                <li>Click "Clear site data" button</li>
+                <li>Close DevTools and reload page (<kbd>Ctrl+Shift+R</kbd>)</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+
+        async function clearEverything() {
+            try {
+                statusEl.textContent = '🔄 Unregistering service workers...';
+                statusEl.className = 'status info';
+
+                // Unregister all service workers
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (let registration of registrations) {
+                    await registration.unregister();
+                    console.log('Unregistered:', registration.scope);
+                }
+
+                statusEl.textContent = '🗑️ Clearing all caches...';
+                
+                // Delete all caches
+                const cacheNames = await caches.keys();
+                for (let cacheName of cacheNames) {
+                    await caches.delete(cacheName);
+                    console.log('Deleted cache:', cacheName);
+                }
+
+                statusEl.textContent = '✅ SUCCESS! Everything cleared. Reloading in 2 seconds...';
+                statusEl.className = 'status success';
+
+                // Wait 2 seconds then reload
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+
+            } catch (err) {
+                statusEl.textContent = '❌ ERROR: ' + err.message + '\nPlease use manual steps below.';
+                statusEl.className = 'status error';
+                console.error('Error clearing:', err);
+            }
+        }
+
+        // Show current status
+        async function showStatus() {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            const cacheNames = await caches.keys();
+            
+            statusEl.innerHTML = `
+                <strong>Current Status:</strong><br>
+                Service Workers: ${registrations.length}<br>
+                Caches: ${cacheNames.length} (${cacheNames.join(', ')})<br>
+                <br>
+                ${registrations.length > 0 || cacheNames.length > 0 ? 
+                  '⚠️ Old cache detected - click "Clear" button above' : 
+                  '✅ All clear - ready to test!'}
+            `;
+            statusEl.className = registrations.length > 0 || cacheNames.length > 0 ? 'status info' : 'status success';
+        }
+
+        showStatus();
+    </script>
+</body>
+</html>

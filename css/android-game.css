@@ -1,0 +1,434 @@
+/*
+ * android-game.css — Android game app styling overrides
+ *
+ * Applied when running inside Capacitor native shell or when the user
+ * explicitly enables the native-app mode.  Loaded as a separate stylesheet
+ * so the web PWA is unaffected.
+ *
+ * Key changes:
+ *  1. Fullscreen-only layout (no white card container)
+ *  2. Dramatically larger touch controls (64-80dp)
+ *  3. Thumb-zone positioning (left = movement, right = jump)
+ *  4. Safe-area-aware HUD
+ *  5. Pause menu overlay
+ *  6. Victory screen
+ *  7. Simplified main menu (no intro screen)
+ */
+
+/* ── Global: Fullscreen game layout ────────────────────────────────── */
+
+body.native-app {
+    padding: 0;
+    margin: 0;
+    overflow: hidden;
+    background: #1a1a2e;
+    /* Prevent rubber-band bounce on iOS WebView */
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: auto;
+}
+
+body.native-app .container {
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    max-width: 100%;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Hide web-only elements in native mode ─────────────────────────── */
+
+body.native-app .intro-screen,
+body.native-app .exit-fullscreen-btn,
+body.native-app .lan-hint,
+body.native-app #feedbackBtn,
+body.native-app #feedbackModal,
+body.native-app .instructions {
+    display: none !important;
+}
+
+/* ── Main Menu Screen (native) ─────────────────────────────────────── */
+
+body.native-app .splash-screen {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 40px 20px;
+    padding-top: calc(40px + env(safe-area-inset-top, 0px));
+}
+
+body.native-app .splash-screen .game-logo {
+    max-width: 200px;
+    margin-bottom: 20px;
+}
+
+body.native-app .splash-screen .splash-subtitle {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 1.2em;
+}
+
+body.native-app .splash-screen .splash-btn {
+    font-size: 1.3em;
+    padding: 16px 40px;
+    min-width: 240px;
+    /* 48dp minimum touch target */
+    min-height: 48px;
+}
+
+/* ── Game Screen (native) ──────────────────────────────────────────── */
+
+body.native-app .game-screen {
+    position: fixed;
+    inset: 0;
+    display: none;
+}
+
+body.native-app .game-screen.active {
+    display: flex;
+    flex-direction: column;
+}
+
+body.native-app .game-screen h1,
+body.native-app .game-screen .upload-section {
+    display: none;
+}
+
+body.native-app .game-canvas-container {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+}
+
+body.native-app #gameCanvas {
+    display: block !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    border: none;
+    border-radius: 0;
+    position: relative;
+    z-index: 1;
+}
+
+/* ── Touch Controls (native) — dramatically larger ─────────────────── */
+
+body.native-app .mobile-controls {
+    display: flex !important;
+    position: fixed;
+    bottom: 16px;
+    left: 0;
+    right: 0;
+    z-index: 200;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 0 16px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    gap: 0;
+    pointer-events: none; /* Let clicks pass through to canvas */
+}
+
+body.native-app .control-btn {
+    pointer-events: auto; /* Re-enable clicks on actual buttons */
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    font-size: 24px;
+    opacity: 0.7;
+    border: 2px solid rgba(255, 255, 255, 0.6);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    transition: transform 0.08s, opacity 0.08s;
+}
+
+body.native-app .control-btn:active {
+    opacity: 1.0;
+    transform: scale(0.92);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+/* Jump button — larger, right side */
+body.native-app .control-btn.jump-btn {
+    width: 80px;
+    height: 80px;
+    border-radius: 40px; /* Circular */
+    font-size: 28px;
+    margin-left: auto; /* Push to right */
+}
+
+/* Movement group — left side */
+body.native-app .movement-group {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+/* Action group — right side, contains jump + respawn */
+body.native-app .action-group {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    margin-left: auto;
+}
+
+/* Respawn button — smaller, next to jump */
+body.native-app .action-group .control-btn.action-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 16px;
+    border-radius: 10px;
+    opacity: 0.6;
+    background: rgba(102, 126, 234, 0.85);
+}
+
+/* ── HUD — safe-area-aware, game-styled ────────────────────────────── */
+
+body.native-app .game-info {
+    position: fixed !important;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 201;
+    background: rgba(0, 0, 0, 0.75);
+    color: #FFD700;
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 215, 0, 0.4);
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    margin-top: env(safe-area-inset-top, 0px);
+    display: none;
+}
+
+body.native-app .word-bar {
+    top: 8px;
+    left: 8px;
+    margin-top: env(safe-area-inset-top, 0px);
+    z-index: 201;
+}
+
+body.native-app .detection-mode-badge {
+    top: 8px;
+    margin-top: env(safe-area-inset-top, 0px);
+    z-index: 201;
+}
+
+/* ── Zoom Controls (native) — simplified ───────────────────────────── */
+
+body.native-app .zoom-controls {
+    display: none !important;
+}
+
+/* ── Pause Button (native) ─────────────────────────────────────────── */
+
+.pause-btn {
+    display: none;
+}
+
+body.native-app .pause-btn {
+    display: flex;
+    position: fixed;
+    top: 8px;
+    right: 8px;
+    margin-top: env(safe-area-inset-top, 0px);
+    margin-right: env(safe-area-inset-right, 0px);
+    z-index: 201;
+    width: 40px;
+    height: 40px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: none;
+    pointer-events: auto;
+}
+
+body.native-app .pause-btn:active {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* ── Pause Menu Overlay ────────────────────────────────────────────── */
+
+.pause-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    background: rgba(0, 0, 0, 0.75);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.pause-overlay.visible {
+    display: flex;
+}
+
+.pause-overlay h2 {
+    color: #FFD700;
+    font-size: 2em;
+    margin-bottom: 12px;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.pause-overlay .pause-menu-btn {
+    width: 220px;
+    padding: 14px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    color: white;
+    cursor: pointer;
+    touch-action: none;
+    transition: transform 0.1s, background 0.1s;
+    text-align: center;
+}
+
+.pause-overlay .pause-menu-btn:active {
+    transform: scale(0.96);
+}
+
+.pause-overlay .pause-menu-btn.primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.pause-overlay .pause-menu-btn.secondary {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* ── Victory Screen Overlay ────────────────────────────────────────── */
+
+.victory-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    background: rgba(0, 0, 0, 0.8);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.victory-overlay.visible {
+    display: flex;
+}
+
+.victory-overlay h2 {
+    color: #FFD700;
+    font-size: 2.5em;
+    margin-bottom: 4px;
+    text-shadow: 0 2px 12px rgba(255, 215, 0, 0.5);
+    animation: victoryPulse 1s ease-in-out infinite;
+}
+
+@keyframes victoryPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.victory-overlay .victory-stats {
+    color: white;
+    font-size: 18px;
+    text-align: center;
+    line-height: 1.8;
+    margin-bottom: 12px;
+}
+
+.victory-overlay .victory-stats .stat-value {
+    color: #FFD700;
+    font-weight: bold;
+}
+
+.victory-overlay .pause-menu-btn {
+    width: 220px;
+    padding: 14px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    color: white;
+    cursor: pointer;
+    touch-action: none;
+    transition: transform 0.1s, background 0.1s;
+    text-align: center;
+}
+
+.victory-overlay .pause-menu-btn:active {
+    transform: scale(0.96);
+}
+
+.victory-overlay .pause-menu-btn.primary {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+
+.victory-overlay .pause-menu-btn.secondary {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* ── ML Loading Overlay ────────────────────────────────────────────── */
+
+.ml-loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    background: rgba(26, 26, 46, 0.95);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.ml-loading-overlay.visible {
+    display: flex;
+}
+
+.ml-loading-overlay .loading-title {
+    color: #FFD700;
+    font-size: 1.4em;
+    font-weight: bold;
+}
+
+.ml-loading-overlay .loading-bar-track {
+    width: 260px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.ml-loading-overlay .loading-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #667eea, #f093fb);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.ml-loading-overlay .loading-tip {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+    max-width: 300px;
+    text-align: center;
+    line-height: 1.5;
+}
