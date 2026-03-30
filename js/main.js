@@ -2322,6 +2322,14 @@ window.addEventListener('resize', () => {
     }
 });
 
+// Pause game when browser tab/window loses visibility (web mode).
+// On Android-native, Capacitor's onAppStateChange handles this instead.
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden && gameRunning && !gamePaused) {
+        pauseGame();
+    }
+});
+
 document.addEventListener('keyup', (e) => {
     if (shouldIgnoreGameKeyEvent(e)) return;
     
