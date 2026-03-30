@@ -62,6 +62,18 @@ body.native-app .instructions {
     display: none !important;
 }
 
+/* ── Hide debug & development UI in native mode ────────────────────── */
+/* Debug checkboxes live inside .instructions (already hidden above),
+   but detection-mode-badge and pause button are standalone elements
+   that overlap in the top-right corner on small screens.  Hide all
+   developer-facing indicators in production native builds.            */
+
+body.native-app .detection-mode-badge,
+body.native-app .detection-mode-badge.visible,
+body.native-app .detection-mode-badge.ml-active {
+    display: none !important;
+}
+
 /* ── Main Menu Screen (native) ─────────────────────────────────────── */
 
 body.native-app .splash-screen {
@@ -326,36 +338,28 @@ body.native-app .action-group .control-btn.action-btn:active {
 /* ── HUD — safe-area-aware, game-styled ────────────────────────────── */
 
 body.native-app .game-info {
-    position: fixed !important;
-    top: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 201;
-    background: rgba(0, 0, 0, 0.75);
-    color: #FFD700;
-    padding: 6px 16px;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 215, 0, 0.4);
-    font-size: 14px;
-    font-weight: bold;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    margin-top: env(safe-area-inset-top, 0px);
-    display: none;
+    /* Game info HUD is rendered directly on canvas in native mode.
+       Force-hide the HTML element so it never bleeds into the viewport,
+       even if JS sets an inline style.display value. */
+    display: none !important;
 }
 
 body.native-app .word-bar {
+    position: fixed;
     top: 8px;
     left: 8px;
+    /* Prevent word bar from bleeding off-screen or overlapping controls */
+    max-width: calc(100vw - 80px);
     margin-top: env(safe-area-inset-top, 0px);
     margin-left: env(safe-area-inset-left, 0px);
     z-index: 201;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-body.native-app .detection-mode-badge {
-    top: 8px;
-    margin-top: env(safe-area-inset-top, 0px);
-    z-index: 201;
-}
+/* detection-mode-badge — hidden in native mode (see debug-hide section above) */
 
 /* ── Zoom Controls (native) — hidden (pinch-to-zoom only) ─────────── */
 
@@ -363,40 +367,17 @@ body.native-app .zoom-controls {
     display: none !important;
 }
 
-/* ── Pause Button (native) — minimum 48dp tap target ───────────────── */
+/* ── Pause Button (native) — hidden to prevent top-right overlap ────── */
+/* The pause button overlaps with the game canvas top-right area.
+   On Android, the system back gesture or a future swipe-down menu
+   can serve as the pause trigger instead.                              */
 
 .pause-btn {
     display: none;
 }
 
 body.native-app .pause-btn {
-    display: flex;
-    position: fixed;
-    top: 8px;
-    right: 8px;
-    margin-top: env(safe-area-inset-top, 0px);
-    margin-right: env(safe-area-inset-right, 0px);
-    z-index: 201;
-    /* 48dp minimum for accessibility */
-    width: 48px;
-    height: 48px;
-    background: rgba(0, 0, 0, 0.6);
-    border: 2px solid rgba(255, 255, 255, 0.5);
-    border-radius: 10px;
-    color: white;
-    font-size: 20px;
-    font-weight: bold;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    touch-action: manipulation;
-    pointer-events: auto;
-    transition: background 0.1s ease-out;
-}
-
-body.native-app .pause-btn:active {
-    background: rgba(255, 255, 255, 0.25);
-    border-color: rgba(255, 255, 255, 0.8);
+    display: none !important;
 }
 
 /* ── Pause Menu Overlay ────────────────────────────────────────────── */
