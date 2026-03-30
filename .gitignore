@@ -38,3 +38,7 @@ android/build/
 *.apk
 *.aab
 *.keystore
+.ejs.db
+.ejs-session-active
+.ejs-session-incomplete
+logs/*.jsonl
