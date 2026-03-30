@@ -353,3 +353,21 @@ Potential enhancements (not implemented):
 ---
 
 **Status**: Implementation complete and working as of 2026-02-03.
+
+---
+
+## Implementation Updates (2026-03-30)
+
+The following changes have been made since this ADR was written:
+
+- **Confidence threshold** lowered from 0.5 to **0.3** (`ML_CONFIDENCE_THRESHOLD` in `js/detection/ml.js`) to improve detection recall for more photo types.
+- **Instance segmentation pipeline** fully implemented:
+  - Uses **YOLOv8n-seg** as interim model (COCO 80-class instance segmentation).
+  - Pipeline: mask coefficients (32 per detection) × prototype masks (160×160×32) → sigmoid → instance masks → top-contour extraction → stepped block-aligned platforms.
+  - New modules: `js/detection/contours.js` (`masksToTopContours`, `contoursToSteppedPlatforms`).
+  - Platforms generated with `kind: 'ml-seg'` are properly handled throughout the pipeline (goal filter, spawn cleanup, alt-path helpers, letter placement).
+- **ONNX Runtime Web** upgraded from 1.17.0 to **1.24.3** (CDN URL updated accordingly).
+- **Service worker** cache version updated to **v3**.
+- **YOLOv8n-seg model output format**: `[1, 116, 8400]` (84 bbox+class features + 32 mask coefficients) plus `[1, 32, 160, 160]` prototype masks.
+- **Express** migrated from v4 to **v5.2.1** (server.js unchanged in behavior).
+- **Capacitor** upgraded from 8.1 to **8.3**.

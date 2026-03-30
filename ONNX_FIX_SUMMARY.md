@@ -118,7 +118,7 @@ WebGL is faster but less stable. WASM is more compatible across browsers.
 
 2. **Fallback to CDN**:
    - JavaScript catches 404, tries next URL
-   - Request CDN: `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js`
+   - Request CDN: `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/ort.min.js`
    - Service worker caches successful response
    - Script loads, `ort` becomes available
 

@@ -111,7 +111,7 @@
 **Other**: suitcase, backpack, vase, potted plant, bowl, clock, teddy bear, remote, mouse, cell phone
 
 ### Not Detected
-❌ Buildings, trees, grass, people, animals
+❌ Buildings, trees, grass, sky, abstract patterns
 
 ## Testing Checklist
 

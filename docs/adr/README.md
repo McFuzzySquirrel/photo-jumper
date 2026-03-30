@@ -12,3 +12,5 @@ This folder contains Architecture Decision Records (ADRs) for Photo Jumper.
 - [ADR 0006: Cross-platform packaging strategy](0006-cross-platform-packaging-strategy.md)
 - [ADR 0007: ONNX Runtime Web implementation and fixes](0007-onnx-runtime-web-implementation-and-fixes.md)
 - [ADR 0008: Letter collection scoring and reachability validation](0008-letter-collection-scoring-and-reachability-validation.md)
+- [ADR 0009: Modular block-based platform system with enhanced reachability](0009-modular-block-platform-system.md)
+- [ADR 0010: Android game app packaging with Capacitor](0010-android-game-app-packaging-with-capacitor.md)

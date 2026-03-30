@@ -30,11 +30,19 @@ The app uses a **CDN-first** approach for ML dependencies:
 **What's included in deployment:**
 ```
 photo-jumper/
-├── index.html          # Main app (everything in one file)
+├── index.html          # Main app
 ├── manifest.json       # PWA manifest
-├── sw.js              # Service worker
+├── sw.js              # Service worker (v3)
+├── js/                # ES module source
+│   ├── config.js
+│   ├── main.js
+│   ├── runtime.js
+│   ├── detection/     # ML, grid, fallback, contours
+│   ├── engine/        # Player, platform, goal, letter
+│   └── platform/      # Native bridge wrappers
+├── css/               # Stylesheets
 ├── icons/             # App icons (small)
-└── server.js          # Optional (only for local dev)
+└── server.js          # Optional (only for local dev + feedback)
 ```
 
 **What's NOT included (loads from CDN):**
@@ -222,9 +230,10 @@ The app tries multiple sources for each dependency:
 1. CDN: `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/ort.min.js` ⭐
 2. Local: `lib/ort.min.js` (if exists)
 
-### YOLOv8n Model
-1. CDN: `https://cdn.jsdelivr.net/gh/aspect-technology/yolov8-onnx@main/models/yolov8n.onnx` ⭐
-2. Local: `models/yolov8n.onnx` (if exists)
+### ML Model (segmentation first, then bbox)
+1. Local seg: `models/yolov8n-seg.onnx` ⭐ (instance segmentation — preferred)
+2. CDN bbox: `https://cdn.jsdelivr.net/gh/aspect-technology/yolov8-onnx@main/models/yolov8n.onnx`
+3. Local bbox: `models/yolov8n.onnx` (if exists)
 
 **Order changed from development:** CDN first ensures deployment works without large files.
 
@@ -247,7 +256,7 @@ The app tries multiple sources for each dependency:
 **Solution:**
 ```javascript
 // Already handled in code:
-const CACHE_NAME = 'photo-jumper-v2'; // Version bump forces update
+const CACHE_NAME = 'photo-jumper-v3'; // Version bump forces update
 ```
 
 Or manually:

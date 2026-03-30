@@ -105,12 +105,18 @@ ML detection is most useful for photos containing:
 
 ## Technical Details
 
-### Segmentation (Planned)
+### Segmentation (Implemented)
 
-YOLOE-26n-seg is the target ML model. It will provide segmentation masks that
-convert into stepped, block-aligned platforms. This is not wired to runtime yet,
-but the pipeline is scaffolded and will replace the bounding-box-only approach
-once the model outputs are confirmed.
+YOLOv8n-seg is the current interim ML model. When the segmentation model is loaded
+(from `models/yolov8n-seg.onnx`), it provides instance segmentation masks that are
+converted into stepped, block-aligned platforms following object contours. This
+produces more natural-feeling platforms than bounding-box-only detection.
+
+YOLOE-26n-seg is the long-term target model. It will replace YOLOv8n-seg once
+available on a public CDN.
+
+If the segmentation model is not available, the pipeline falls back to the
+bounding-box-only YOLOv8n model (loaded from CDN).
 
 ### Why These Specific Objects?
 
@@ -125,14 +131,22 @@ Objects are detected based on what the YOLOv8 model can recognize in the COCO da
 
 ### Confidence Threshold
 
-- Default: 50% confidence required
+- Default: 30% confidence required (0.3)
 - Lower threshold = more detections (but more false positives)
-- Current setting is balanced for accuracy
+- Current setting is tuned for recall over precision
 
 ### Platform Generation
 
-For each platformable object:
-1. Get bounding box (x, y, width, height)
+**With segmentation model (YOLOv8n-seg):**
+1. Run inference → get bounding boxes + 32 mask coefficients per object + 160×160 prototype masks
+2. Multiply mask coefficients by prototype masks → apply sigmoid → instance masks
+3. Extract top contour from each mask (scan each column top-to-bottom)
+4. Convert contours to stepped, block-aligned platforms (20px grid)
+5. Merge nearby platforms and exclude reserved zones (start, goal, word bar)
+6. Combine with grid-based platforms (fill gaps)
+
+**With bounding-box model (YOLOv8n fallback):**
+1. Get bounding box (x, y, width, height) for each platformable object
 2. Calculate top surface (y coordinate)
 3. Create platform from top edge
 4. Merge with nearby ML platforms

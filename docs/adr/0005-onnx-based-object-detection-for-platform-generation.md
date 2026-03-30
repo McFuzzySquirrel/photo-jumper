@@ -123,3 +123,16 @@ When debug overlay is enabled, detected objects are shown with:
 - ADR 0002: Gameplay-first platform generation and reachability
 - ADR 0003: Improve platform detection density
 - Research: `learning/journey/research/object-detection.md`
+
+---
+
+## Implementation Updates (2026-03-30)
+
+The following changes have been made since this ADR was written:
+
+- **Confidence threshold** lowered from 0.5 to **0.3** (`ML_CONFIDENCE_THRESHOLD` in `js/detection/ml.js`) to improve detection recall.
+- **Instance segmentation** fully implemented using YOLOv8n-seg as an interim model. The pipeline extracts mask coefficients × prototype masks → sigmoid → instance masks → stepped block-aligned platforms. This produces contour-following platforms (`kind: 'ml-seg'`) rather than flat bounding-box platforms.
+- **ONNX Runtime Web** upgraded from 1.17.0 to **1.24.3**.
+- **Code structure** migrated from single-file `index.html` to ES modules under `js/detection/ml.js`, `js/detection/contours.js`, and `js/config.js`.
+- **Execution provider** simplified to WASM-only (WebGL removed for stability).
+- **Fallback loading order** is now: CDN runtime first → local runtime fallback; segmentation model (local) → CDN bbox model → local bbox model.

@@ -67,7 +67,7 @@ A web-based platform jumping game that converts your photos into playable levels
 - 🔒 **Privacy First**: All photos are processed entirely in your browser - no uploads, no storage, no transmission to any server
 - 🎨 **Dynamic Level Generation**: Photos are automatically converted into block-based platforms
 - 🧱 **Retro Block Aesthetic**: 16-bit Mario-style modular block platforms with clear collision boundaries
-- 🤖 **ML Object Detection (Experimental)**: Optional ONNX-based detection for 51 object types
+- 🤖 **ML Object Detection (Experimental)**: Optional ONNX-based detection for 51 object types with **instance segmentation** — detected objects produce stepped, contour-following platforms (not just flat bounding boxes)
 - 🖼️ **Photo Background**: Your photo displays as the game background with zoom and camera following
 - 🎮 **Classic Platform Gameplay**: Jump and navigate through your photo-based levels
 - 🔤 **Letter Collection**: Collect letters to spell words for bonus points
@@ -307,11 +307,12 @@ The game uses HTML5 Canvas and modern web technologies to:
 4. Filter and merge platforms for optimal gameplay
 
 ### ML Object Detection (Optional)
-1. Load ONNX Runtime Web from CDN (no installation needed!)
-2. Run YOLOv8n object detection model in the browser
+1. Load ONNX Runtime Web 1.24.3 from CDN (no installation needed!)
+2. Run YOLOv8n-seg instance segmentation model in the browser
 3. Detect 51 object types (furniture, vehicles, animals, people, electronics, etc.)
-4. Generate platforms from detected object boundaries
-5. Combine with grid-based platforms for hybrid approach
+4. Extract segmentation masks and convert to stepped, block-aligned platforms that follow object contours
+5. Fall back to bounding-box-only detection if segmentation model is unavailable
+6. Combine with grid-based platforms for hybrid approach
 
 ### Gameplay
 1. Display the original photo as the game background

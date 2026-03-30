@@ -1,5 +1,7 @@
 # PRD: ML-Primary Platform Generation
 
+> **Implementation Status (2026-03-30):** The segmentation pipeline described below is **implemented** using YOLOv8n-seg as an interim model. The contour-to-stepped-platform conversion, fallback chain, and module split are all functional. YOLOE-26n-seg will replace YOLOv8n-seg when available on a public CDN. See `js/detection/ml.js`, `js/detection/contours.js`, and the current-state PRD for details.
+
 ## Summary
 Switch platform generation to an ML-primary pipeline using YOLOE-26n-seg (open-vocabulary + segmentation). Replace the current grid-first hybrid with a confidence-based fallback chain for ML-sparse photos. Preserve block-based rendering and gameplay-first constraints. Split the monolithic game file into ES modules without introducing a build step.
 

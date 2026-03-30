@@ -1,7 +1,7 @@
 # Project Progress
 
 ## Current State
-**Phase**: Phase 3 — Mobile & Native Packaging (Completion)
+**Phase**: Phase 4 — Hardening & Documentation Alignment
 **Status**: In Progress
 **Last Updated**: 2026-03-30
 **PRD**: docs/prd/photo-jumper-current-state-prd.md
@@ -33,21 +33,33 @@
   - Files: js/main.js (4 kind-check fixes), js/detection/contours.js (constructor clone fix)
   - Notes: Found 5 bugs where ml-seg kind was missing from pipeline checks (goal filter, spawn cleanup, alt-path helpers, letter placement, mergeSteppedPlatforms). All fixed. Commit: 9106202
 
+- [x] Phase 3, Task 3.4: Android UX polish (@android-engineer)
+  - Files: css/android-game.css, js/platform/native-bridge.js, js/main.js, index.html
+  - Notes: Touch controls (opacity, glow, 48dp targets), haptics (warning on respawn), overlays (touch-action:none, share button), immersive mode, safe area insets, rotate hint. Commit: f9e4bfd
+- [x] Phase 3, Task 3.5: Device QA matrix (@qa-tester)
+  - Files: js/main.js (visibilitychange fix)
+  - Notes: 93/93 checks passed. 1 bug fixed (tab visibility pause). 4 findings logged (no P key pause, no pinch zoom, seg model not on disk, clock during pause). Commit: 5b11af0
+- [x] Phase 4, Task 4.1: Dependency upgrades (@project-architect)
+  - Files: package.json, package-lock.json, js/detection/ml.js, sw.js, test-onnx.html, docs/ONNX_SETUP.md, docs/DEPLOYMENT.md, docs/adr/0005-*.md
+  - Notes: Express 4→5, ONNX 1.17→1.24.3, Capacitor 8.1→8.3. All verified. Commit: 70381bd
+
 ## Current Task
-- [ ] Phase 3, Task 3.4: Android UX polish (@android-engineer, @ui-controls-engineer)
-  - Status: In progress
-  - Notes: Polish touch controls, haptic feedback, native overlays
-- [ ] Phase 3, Task 3.4: Android UX polish (@android-engineer, @ui-controls-engineer)
-- [ ] Phase 3, Task 3.5: Device QA matrix (@qa-tester, @android-engineer)
-- [ ] Phase 4, Task 4.1: Dependency upgrades (@project-architect)
 - [ ] Phase 4, Task 4.2: Automated test suite (@qa-tester)
+  - Status: In progress
+  - Notes: Set up Vitest, write unit/integration tests for detection, reachability, physics, letter placement
 - [ ] Phase 4, Task 4.3: Documentation alignment (@project-architect)
+  - Status: In progress
+  - Notes: Aligning all docs with runtime constants and current behavior
+## Remaining
+- [ ] Phase 4, Task 4.4: Production readiness checklist
 
 ## Blockers
 - None
 
 ## Notes
 - Phase 1 fully complete — modular ES module structure established
-- Fallback algorithms in js/detection/ are placeholder functions that need real implementations
-- ML defaults still OFF (ML_DETECTION_ENABLED_DEFAULT = false)
-- Model strategy calls for YOLOE-26n-seg but runtime references YOLOv8n URLs
+- Phase 2 fully complete — fallback algorithms functional, YOLOE segmentation implemented, pipeline validated
+- Phase 3 fully complete — Android UX polished, 93/93 QA checks passed
+- Dependencies upgraded: Express 5.2.1, ONNX Runtime 1.24.3, Capacitor 8.3
+- ML defaults still OFF (ML_DETECTION_ENABLED_DEFAULT = false) — by design for web mode
+- YOLOv8n-seg model used as interim until YOLOE-26n-seg published to CDN

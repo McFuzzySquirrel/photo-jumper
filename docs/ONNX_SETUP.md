@@ -4,10 +4,11 @@ This guide explains how to enable and troubleshoot ML-based object detection in 
 
 ## Overview
 
-Photo Jumper can optionally use machine learning (YOLO v8) to detect objects in photos and create platforms from them. This feature is:
+Photo Jumper can optionally use machine learning (YOLOv8n-seg / YOLOv8n) to detect objects in photos and create platforms from them. This feature is:
 - **Optional** - The game works perfectly fine without it
-- **Experimental** - Uses ONNX Runtime Web for browser-based ML
+- **Experimental** - Uses ONNX Runtime Web 1.24.3 for browser-based ML
 - **Self-contained** - All dependencies can load from CDN (no local files required)
+- **Segmentation-capable** - When the YOLOv8n-seg model is available locally, platforms follow object contours instead of flat bounding boxes
 
 ## Quick Start
 
@@ -102,7 +103,7 @@ If you want to use ML detection offline or avoid CDN dependencies:
 
 2. **Check confidence threshold:**
    - Set lower threshold in code: `ML_CONFIDENCE_THRESHOLD = 0.3`
-   - Default is 0.5 (50% confidence required)
+   - Default is 0.3 (30% confidence required)
 
 3. **Enable debug overlay:**
    - Check "Debug overlay" checkbox
@@ -130,11 +131,19 @@ If you want to use ML detection offline or avoid CDN dependencies:
   - Runs in WebAssembly for performance
   - ~2MB download (runtime + WASM)
 
-- **YOLOv8n Model:** 
-  - Nano version (smallest YOLO model)
+- **YOLOv8n-seg Model** (preferred, local):
+  - Instance segmentation version (masks + bounding boxes)
+  - 80 COCO object classes
+  - ~12 MB download
+  - Input: 640×640 RGB image
+  - Output: Bounding boxes + class probabilities + 32 mask coefficients + 160×160 prototype masks
+  - To obtain: `yolo export model=yolov8n-seg.pt format=onnx imgsz=640`, then place at `models/yolov8n-seg.onnx`
+
+- **YOLOv8n Model** (fallback, CDN):
+  - Nano version — bounding-box-only (smallest YOLO model)
   - 80 COCO object classes
   - ~6MB download
-  - Input: 640x640 RGB image
+  - Input: 640×640 RGB image
   - Output: Bounding boxes + class probabilities
 
 ### How It Works
@@ -142,14 +151,15 @@ If you want to use ML detection offline or avoid CDN dependencies:
 1. User uploads photo
 2. User enables ML checkbox
 3. App loads ONNX Runtime (if not already loaded)
-4. App loads YOLOv8n model (if not already loaded)
-5. Photo is preprocessed (resized to 640x640, normalized)
+4. App loads model: tries YOLOv8n-seg (local) first, then YOLOv8n (CDN), then YOLOv8n (local)
+5. Photo is preprocessed (resized to 640×640, normalized)
 6. ML inference runs (2-5 seconds)
-7. Detected objects are filtered by:
-   - Confidence > 50%
-   - Object class is "platformable"
-   - Bounding box size > minimum
-8. Bounding boxes are converted to platforms
+7. If segmentation model loaded:
+   - Mask coefficients × prototype masks → sigmoid → instance masks
+   - Contour extraction produces stepped, block-aligned platforms (`kind: 'ml-seg'`)
+8. If bounding-box-only model loaded:
+   - Detected objects are filtered by confidence > 30% and "platformable" class
+   - Bounding boxes are converted to platforms
 9. Platforms are merged with grid-detected platforms
 10. Final platforms are validated for gameplay
 
@@ -157,13 +167,14 @@ If you want to use ML detection offline or avoid CDN dependencies:
 
 The app tries multiple sources for each dependency:
 
-**ONNX Runtime:**
-1. Local: `lib/ort.min.js`
-2. CDN: `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/ort.min.js`
+**ONNX Runtime (CDN first, local fallback):**
+1. CDN: `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/ort.min.js`
+2. Local: `lib/ort.min.js`
 
-**YOLOv8n Model:**
-1. Local: `models/yolov8n.onnx`
-2. CDN: `https://cdn.jsdelivr.net/gh/aspect-technology/yolov8-onnx@main/models/yolov8n.onnx`
+**Model (segmentation first, then bbox):**
+1. Local seg: `models/yolov8n-seg.onnx` (instance segmentation — preferred)
+2. CDN bbox: `https://cdn.jsdelivr.net/gh/aspect-technology/yolov8-onnx@main/models/yolov8n.onnx`
+3. Local bbox: `models/yolov8n.onnx`
 
 If any source fails, the next one is tried automatically.
 
@@ -222,6 +233,7 @@ Potential enhancements (not yet implemented):
 - [ ] WebGL execution provider (faster but less compatible)
 - [ ] Object detection preview before gameplay
 - [ ] Platform editing/adjustment tools
+- [x] ~~Instance segmentation for contour-following platforms~~ — Implemented with YOLOv8n-seg
 
 ---
 
