@@ -5,6 +5,8 @@
   "description": "Photo Jumper - a PWA platform game that turns your photos into playable levels",
   "main": "server.js",
   "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
     "start": "node server.js",
     "cap:copy": "rsync -a --delete --exclude='node_modules' --exclude='.git' --exclude='android' --exclude='www' --exclude='feedback' --exclude='tmp' --exclude='temp' --exclude='learning' --exclude='ejs-docs' --exclude='docs' --exclude='.github' --exclude='package-lock.json' --exclude='capacitor.config.ts' . www/ && npx cap copy android",
     "cap:sync": "npm run cap:copy && npx cap sync android",
@@ -26,6 +28,7 @@
     "express": "^5.2.1"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.2"
   }
 }
