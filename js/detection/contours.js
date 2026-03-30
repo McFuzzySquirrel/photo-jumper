@@ -226,7 +226,14 @@ function mergeSteppedPlatforms(platforms, mergeGapPx) {
 
     const sorted = [...platforms].sort((a, b) => a.y - b.y || a.x - b.x);
     const merged = [];
-    let current = { ...sorted[0] };
+
+    // Clone via constructor so merged platforms keep their Platform prototype
+    // (methods like draw()).  Object-spread would create plain objects.
+    function clonePlatform(p) {
+        return new p.constructor(p.x, p.y, p.width, p.height, p.color, p.kind);
+    }
+
+    let current = clonePlatform(sorted[0]);
 
     for (let i = 1; i < sorted.length; i++) {
         const next = sorted[i];
@@ -238,7 +245,7 @@ function mergeSteppedPlatforms(platforms, mergeGapPx) {
             current.width = newRight - current.x;
         } else {
             merged.push(current);
-            current = { ...next };
+            current = clonePlatform(next);
         }
     }
 

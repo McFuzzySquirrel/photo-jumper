@@ -879,7 +879,7 @@ async function processImage(image) {
     // Goal should be: reachable, sufficiently far from start, preferably high up
     // Get candidate platforms for goal placement (photo/ml platforms in upper half)
     const candidateGoalPlatforms = platforms.filter(p => {
-        if (p.kind !== 'photo' && p.kind !== 'ml') return false;
+        if (p.kind !== 'photo' && p.kind !== 'ml' && p.kind !== 'ml-seg') return false;
         // Prefer upper 60% of the level
         if (p.y > height * 0.6) return false;
         // Must not overlap with start area
@@ -967,7 +967,7 @@ async function processImage(image) {
     
     platforms = platforms.filter(platform => {
         // Keep non-photo/non-ml platforms (ground/start/goal/helper)
-        if (platform.kind !== 'photo' && platform.kind !== 'ml') return true;
+        if (platform.kind !== 'photo' && platform.kind !== 'ml' && platform.kind !== 'ml-seg') return true;
 
         // Remove photo/ml platforms that overlap with spawn area
         const overlaps = !(platform.x + platform.width < spawnCheckX ||
@@ -1051,7 +1051,7 @@ async function processImage(image) {
         // Collect unreachable photo/ML platforms worth connecting
         const unreachable = traversable.filter(p =>
             !reachableSet.has(p) &&
-            (p.kind === 'photo' || p.kind === 'ml') &&
+            (p.kind === 'photo' || p.kind === 'ml' || p.kind === 'ml-seg') &&
             p.width >= blockSize * 2
         );
         
@@ -1213,7 +1213,7 @@ function placeLettersOnPlatforms(startPlatform, limits) {
     const jumpHeight = limits.maxJumpUp;
     const suitablePlatforms = platforms.filter(p => {
         // Must be a photo/ml/helper platform (NOT goal)
-        if (p.kind !== 'photo' && p.kind !== 'ml' && p.kind !== 'helper') {
+        if (p.kind !== 'photo' && p.kind !== 'ml' && p.kind !== 'ml-seg' && p.kind !== 'helper') {
             return false;
         }
         
