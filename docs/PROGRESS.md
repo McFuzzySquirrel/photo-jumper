@@ -47,9 +47,9 @@
 - [ ] Phase 4, Task 4.2: Automated test suite (@qa-tester)
   - Status: In progress
   - Notes: Set up Vitest, write unit/integration tests for detection, reachability, physics, letter placement
-- [ ] Phase 4, Task 4.3: Documentation alignment (@project-architect)
-  - Status: In progress
-  - Notes: Aligning all docs with runtime constants and current behavior
+- [x] Phase 4, Task 4.3: Documentation alignment (@project-architect)
+  - Status: Done
+  - Notes: 12 doc files updated — PRD, README, ONNX_SETUP, DEPLOYMENT, ML_DETECTION_GUIDE, ADR index/0005/0007, ml-primary-architecture, PROGRESS, ONNX_FIX_SUMMARY, SESSION_SUMMARY. Commit: 41fed93
 ## Remaining
 - [ ] Phase 4, Task 4.4: Production readiness checklist
 
