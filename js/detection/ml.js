@@ -36,7 +36,7 @@ export const ML_MODEL_URLS = [
 ];
 // ONNX Runtime URLs: CDN first for deployments, local fallback
 export const ONNX_RUNTIME_URLS = [
-    'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js',
+    'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/ort.min.js',
     'lib/ort.min.js'
 ];
 
@@ -95,7 +95,7 @@ export function resetOnnxLoadError() {
 async function loadONNXRuntime(onStatus) {
     if (typeof ort !== 'undefined') {
         if (!ort.env.wasm.wasmPaths) {
-            ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/';
+            ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/';
         }
         return true;
     }
@@ -195,7 +195,7 @@ export async function initONNXModel({ onStatus }) {
         console.info('3. Browser compatibility - try Chrome/Edge');
         console.info('');
         console.info('CDN URLs tried:');
-        console.info('- Runtime: https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/');
+        console.info('- Runtime: https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/');
         console.info('- Model: https://cdn.jsdelivr.net/gh/aspect-technology/yolov8-onnx@main/');
         console.info('');
         console.info('See docs/ONNX_SETUP.md for full troubleshooting guide.');

@@ -1,8 +1,8 @@
 // Photo Jumper Service Worker
 // Enables offline play and PWA installation
 
-const CACHE_NAME = 'photo-jumper-v2';
-const OFFLINE_CACHE_NAME = 'photo-jumper-offline-v2';
+const CACHE_NAME = 'photo-jumper-v3';
+const OFFLINE_CACHE_NAME = 'photo-jumper-offline-v3';
 
 // Core files to cache for offline use
 const CORE_ASSETS = [

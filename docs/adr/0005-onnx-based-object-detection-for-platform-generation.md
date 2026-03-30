@@ -44,7 +44,7 @@ We will implement ONNX-based object detection as an **optional, experimental fea
    - Model: `yolov8n.onnx` → `models/` folder
      - Download from [Ultralytics releases](https://github.com/ultralytics/assets/releases)
    - Runtime: `ort.min.js` and `ort-wasm*.wasm` → `lib/` folder
-     - Download from [onnxruntime-web CDN](https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/)
+     - Download from [onnxruntime-web CDN](https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/)
 
 2. **Object-to-Platform Mapping**
    - **Top edge heuristic**: Use the top edge of detected objects as platform surfaces (where you'd actually stand)

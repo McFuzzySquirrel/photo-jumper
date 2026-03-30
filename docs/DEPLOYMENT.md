@@ -174,7 +174,7 @@ If you want self-hosted ML:
 mkdir lib
 
 # Download runtime and WASM files from:
-# https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/
+# https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/
 
 # Files needed:
 # - ort.min.js
@@ -219,7 +219,7 @@ git push
 The app tries multiple sources for each dependency:
 
 ### ONNX Runtime
-1. CDN: `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js` ⭐
+1. CDN: `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/ort.min.js` ⭐
 2. Local: `lib/ort.min.js` (if exists)
 
 ### YOLOv8n Model

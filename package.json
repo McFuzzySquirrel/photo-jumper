@@ -14,16 +14,16 @@
     "icons": "node scripts/generate-icons.js"
   },
   "dependencies": {
-    "@capacitor/android": "^8.1.0",
-    "@capacitor/app": "^8.0.0",
-    "@capacitor/camera": "^8.0.0",
-    "@capacitor/cli": "^8.1.0",
-    "@capacitor/core": "^8.1.0",
-    "@capacitor/haptics": "^8.0.0",
-    "@capacitor/screen-orientation": "^8.0.0",
-    "@capacitor/splash-screen": "^8.0.0",
-    "@capacitor/status-bar": "^8.0.0",
-    "express": "^4.22.1"
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/camera": "^8.0.2",
+    "@capacitor/cli": "^8.3.0",
+    "@capacitor/core": "^8.3.0",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/screen-orientation": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "typescript": "^5.9.3"

@@ -34,7 +34,7 @@ Photo Jumper can optionally use machine learning (YOLO v8) to detect objects in 
 If you want to use ML detection offline or avoid CDN dependencies:
 
 1. **Download ONNX Runtime Web files:**
-   - Go to: https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/
+   - Go to: https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/
    - Download these files:
      - `ort.min.js`
      - `ort-wasm.wasm`
@@ -125,7 +125,7 @@ If you want to use ML detection offline or avoid CDN dependencies:
 
 ### Dependencies
 
-- **ONNX Runtime Web:** 1.17.0
+- **ONNX Runtime Web:** 1.24.3
   - JavaScript ML inference engine
   - Runs in WebAssembly for performance
   - ~2MB download (runtime + WASM)
@@ -159,7 +159,7 @@ The app tries multiple sources for each dependency:
 
 **ONNX Runtime:**
 1. Local: `lib/ort.min.js`
-2. CDN: `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js`
+2. CDN: `https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/ort.min.js`
 
 **YOLOv8n Model:**
 1. Local: `models/yolov8n.onnx`
