@@ -1,8 +1,8 @@
 # Project Progress
 
 ## Current State
-**Phase**: Phase 4 — Hardening & Documentation Alignment
-**Status**: In Progress
+**Phase**: All Phases Complete
+**Status**: Complete
 **Last Updated**: 2026-03-30
 **PRD**: docs/prd/photo-jumper-current-state-prd.md
 
@@ -44,14 +44,14 @@
   - Notes: Express 4→5, ONNX 1.17→1.24.3, Capacitor 8.1→8.3. All verified. Commit: 70381bd
 
 ## Current Task
-- [ ] Phase 4, Task 4.2: Automated test suite (@qa-tester)
-  - Status: In progress
-  - Notes: Set up Vitest, write unit/integration tests for detection, reachability, physics, letter placement
+- [x] Phase 4, Task 4.2: Automated test suite (@qa-tester)
+  - Files: tests/config.test.js, tests/reachability.test.js, tests/physics.test.js, tests/fallback.test.js, tests/contours.test.js, tests/pipeline.test.js, tests/helpers.test.js, tests/platform.test.js, vitest.config.js, package.json
+  - Notes: 165 tests across 8 files, 517ms. Found production bug in helpers.js (infinite loop). Commit: c0406f7
 - [x] Phase 4, Task 4.3: Documentation alignment (@project-architect)
   - Status: Done
   - Notes: 12 doc files updated — PRD, README, ONNX_SETUP, DEPLOYMENT, ML_DETECTION_GUIDE, ADR index/0005/0007, ml-primary-architecture, PROGRESS, ONNX_FIX_SUMMARY, SESSION_SUMMARY. Commit: 41fed93
 ## Remaining
-- [ ] Phase 4, Task 4.4: Production readiness checklist
+- None — all phases complete
 
 ## Blockers
 - None
