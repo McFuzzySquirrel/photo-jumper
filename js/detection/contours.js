@@ -1,10 +1,21 @@
+// ---------------------------------------------------------------------------
+// masksToTopContours — Extract the topmost contour of each instance mask
+//
+// For each mask (output of computeInstanceMasks or a generic mask tensor):
+//   1. Scan each column top-to-bottom; the first pixel with value > 0.5 is the
+//      top-surface Y for that column.
+//   2. Scale from mask resolution (e.g. 160×160 proto space) to world space.
+//   3. Fill small gaps (≤ 4 px) via linear interpolation.
+//   4. Smooth with a 3-pixel moving-average window to reduce staircase noise.
+//
+// Returns Array<{ contour: number[], width: number, height: number }>
+// where contour[x] is the world-space Y of the top surface, or null.
+// ---------------------------------------------------------------------------
 export function masksToTopContours(options) {
     const { masks, width, height } = options;
 
     if (!masks || masks.length === 0) return [];
 
-    // Placeholder: expects masks as arrays of { data, width, height }
-    // TODO: Replace with YOLOE segmentation tensor parsing.
     const contours = [];
 
     for (const mask of masks) {
@@ -99,6 +110,18 @@ function fillContourGaps(contour, maxGap) {
     return filled;
 }
 
+// ---------------------------------------------------------------------------
+// contoursToSteppedPlatforms — Convert contour arrays to block-aligned platforms
+//
+// Instead of producing one flat platform per contiguous mask region, this
+// function creates a *staircase* of platforms that follow the contour shape.
+// Whenever the contour's Y value snaps to a different block-grid row, a new
+// platform step begins.  Each step must meet the minimum width (2 blocks)
+// and is excluded if it falls inside a reserved zone (start area, goal area,
+// or word bar).
+//
+// Returns Array<Platform> with kind = 'ml-seg'.
+// ---------------------------------------------------------------------------
 export function contoursToSteppedPlatforms(options) {
     const {
         contours,
@@ -120,46 +143,73 @@ export function contoursToSteppedPlatforms(options) {
 
     const platforms = [];
 
+    // Helper: finalise a single step into a snapped platform
+    function emitPlatform(startX, endX, snappedY) {
+        const runWidth = endX - startX + 1;
+        // Round width up to the nearest whole-block multiple
+        const snappedWidth = Math.ceil(runWidth / blockSize) * blockSize;
+
+        // Enforce minimum platform width (2 blocks = 40 px)
+        if (snappedWidth < platformMinWidth) return;
+
+        // Snap X to block grid and clamp within world bounds
+        const snappedX = Math.floor(startX / blockSize) * blockSize;
+        const finalX = Math.max(0, Math.min(worldWidth - snappedWidth, snappedX));
+        const finalY = Math.max(0, Math.min(worldHeight - blockSize, snappedY));
+
+        // --- Exclude reserved zones ---
+        // Start area: bottom-left corner
+        const isStartArea = (finalX < startAreaWidth && finalY > worldHeight - startAreaHeight);
+        // Goal area: top-right corner
+        const isGoalArea = (finalX > worldWidth - goalAreaWidth && finalY < goalAreaHeight);
+        // Word bar: thin strip along the very top of the world
+        const isWordBarArea = (finalY < wordBarAreaHeight);
+        if (isStartArea || isGoalArea || isWordBarArea) return;
+
+        platforms.push(new platformClass(
+            finalX,
+            finalY,
+            snappedWidth,
+            blockSize,
+            color,
+            'ml-seg'
+        ));
+    }
+
+    // Process each contour (one per detected object mask)
     for (const item of contours) {
-        const { contour, width, height } = item;
-        let runStart = null;
+        const { contour, width } = item;
+        if (!contour || contour.length === 0) continue;
 
+        let stepStartX = null;   // leftmost X of the current step
+        let stepSnappedY = null; // block-grid Y of the current step
+
+        // Walk left-to-right.  At x === width we inject a sentinel null
+        // so that any open step is finalised automatically.
         for (let x = 0; x <= width; x++) {
-            const y = x < width ? contour[x] : null;
-            if (y !== null && runStart === null) {
-                runStart = x;
-            }
-            if ((y === null || x === width) && runStart !== null) {
-                const runEnd = x - 1;
-                const runWidth = runEnd - runStart + 1;
-                const snappedWidth = Math.ceil(runWidth / blockSize) * blockSize;
+            const y = (x < width) ? contour[x] : null;
 
-                if (snappedWidth >= platformMinWidth) {
-                    const worldX = runStart;
-                    const worldY = contour[Math.min(runStart, contour.length - 1)];
-                    const snappedX = Math.floor(worldX / blockSize) * blockSize;
-                    const snappedY = Math.floor(worldY / blockSize) * blockSize;
-                    const finalX = Math.max(0, Math.min(worldWidth - snappedWidth, snappedX));
-                    const finalY = Math.max(0, Math.min(worldHeight - blockSize, snappedY));
+            if (y !== null) {
+                // Snap this column's Y to the block grid
+                const snappedY = Math.floor(y / blockSize) * blockSize;
 
-                    const isStartArea = (finalX < startAreaWidth && finalY > worldHeight - startAreaHeight);
-                    const isGoalArea = (finalX > worldWidth - goalAreaWidth && finalY < goalAreaHeight);
-                    const isWordBarArea = (finalY < wordBarAreaHeight);
-                    if (isStartArea || isGoalArea || isWordBarArea) {
-                        continue;
-                    }
-
-                    platforms.push(new platformClass(
-                        finalX,
-                        finalY,
-                        snappedWidth,
-                        blockSize,
-                        color,
-                        'ml-seg'
-                    ));
+                if (stepStartX === null) {
+                    // Begin a brand-new step
+                    stepStartX = x;
+                    stepSnappedY = snappedY;
+                } else if (snappedY !== stepSnappedY) {
+                    // The contour has moved to a different block row —
+                    // finalise the current step and start a new one.
+                    emitPlatform(stepStartX, x - 1, stepSnappedY);
+                    stepStartX = x;
+                    stepSnappedY = snappedY;
                 }
-
-                runStart = null;
+                // Otherwise same row: keep extending the current step
+            } else if (stepStartX !== null) {
+                // Null gap or sentinel — finalise the current step
+                emitPlatform(stepStartX, x - 1, stepSnappedY);
+                stepStartX = null;
+                stepSnappedY = null;
             }
         }
     }
