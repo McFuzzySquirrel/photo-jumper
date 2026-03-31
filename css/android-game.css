@@ -308,7 +308,7 @@ body.native-app .control-btn.jump-btn:active {
 /* Movement group — left thumb zone */
 body.native-app .movement-group {
     display: flex;
-    gap: 8px;
+    gap: 12px;
     align-items: flex-end;
 }
 
@@ -367,17 +367,45 @@ body.native-app .zoom-controls {
     display: none !important;
 }
 
-/* ── Pause Button (native) — hidden to prevent top-right overlap ────── */
-/* The pause button overlaps with the game canvas top-right area.
-   On Android, the system back gesture or a future swipe-down menu
-   can serve as the pause trigger instead.                              */
+/* ── Pause Button (native) — top-right, safe-area aware ────────────── */
+/* Small, low-opacity pause icon consistent with industry-standard
+   mobile game UX.  Complements the Android back-button/gesture
+   for users who don't instinctively use system navigation to pause.    */
 
 .pause-btn {
     display: none;
 }
 
 body.native-app .pause-btn {
-    display: none !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    margin-top: env(safe-area-inset-top, 0px);
+    margin-right: env(safe-area-inset-right, 0px);
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    font-size: 18px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    color: white;
+    opacity: 0.5;
+    z-index: 201;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: opacity 0.15s ease-out, background 0.15s ease-out;
+    pointer-events: auto;
+}
+
+body.native-app .pause-btn:active {
+    opacity: 1.0;
+    background: rgba(0, 0, 0, 0.55);
+    border-color: rgba(255, 255, 255, 0.5);
 }
 
 /* ── Pause Menu Overlay ────────────────────────────────────────────── */

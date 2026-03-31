@@ -2399,12 +2399,28 @@ document.addEventListener('keyup', (e) => {
 });
 
 // Touch controls for mobile
+// Dead zone: ignore canvas touches in the bottom 20% when button controls are
+// visible.  This prevents accidental jumps when the player's thumb drifts off
+// the on-screen buttons onto the canvas behind them.
+// Note: uses getBoundingClientRect() which is correct for our fixed-position
+// fullscreen canvas (position:fixed, inset:0 in native; no scroll offset).
+const TOUCH_DEAD_ZONE_RATIO = 0.20;
+
+function isTouchInDeadZone(touch, rect) {
+    if (!mobileControls || !mobileControls.classList.contains('visible')) return false;
+    const relativeY = touch.clientY - rect.top;
+    return relativeY > rect.height * (1 - TOUCH_DEAD_ZONE_RATIO);
+}
+
 canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
     const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
     touchStartX = touch.clientX - rect.left;
     touchStartY = touch.clientY - rect.top;
+    
+    // Skip jump if touch is in the dead zone near on-screen buttons
+    if (isTouchInDeadZone(touch, rect)) return;
     
     // Jump on tap
     touchJumpingRef.value = true;
@@ -2414,6 +2430,10 @@ canvas.addEventListener('touchmove', (e) => {
     e.preventDefault();
     const touch = e.touches[0];
     const rect = canvas.getBoundingClientRect();
+    
+    // Ignore drag input from the button dead zone
+    if (isTouchInDeadZone(touch, rect)) return;
+    
     const touchX = touch.clientX - rect.left;
     const touchY = touch.clientY - rect.top;
     
