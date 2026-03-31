@@ -391,7 +391,7 @@ body.native-app .pause-btn {
     font-size: 18px;
     background: rgba(0, 0, 0, 0.35);
     border: 1.5px solid rgba(255, 255, 255, 0.25);
-    color: rgba(255, 255, 255, 0.7);
+    color: white;
     opacity: 0.5;
     z-index: 201;
     cursor: pointer;

@@ -2402,6 +2402,8 @@ document.addEventListener('keyup', (e) => {
 // Dead zone: ignore canvas touches in the bottom 20% when button controls are
 // visible.  This prevents accidental jumps when the player's thumb drifts off
 // the on-screen buttons onto the canvas behind them.
+// Note: uses getBoundingClientRect() which is correct for our fixed-position
+// fullscreen canvas (position:fixed, inset:0 in native; no scroll offset).
 const TOUCH_DEAD_ZONE_RATIO = 0.20;
 
 function isTouchInDeadZone(touch, rect) {
